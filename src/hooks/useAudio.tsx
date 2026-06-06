@@ -508,24 +508,51 @@ export function AudioProvider({
     tryStartMusic()
   }, [stopMusic, tryStartMusic])
 
-  // Unlock audio on the first user gesture (browsers suspend the AudioContext
-  // until then) and kick off any music that was requested while locked. Stays
-  // attached so it also recovers if the context is suspended again (e.g. the
-  // tab was backgrounded). All start paths are idempotent.
+  // Unlock audio on the first user gesture. Desktop browsers just need the
+  // AudioContext resumed, but iOS Safari is stricter: it additionally needs a
+  // silent buffer played *inside* the gesture to open the output path, and it
+  // re-suspends ("interrupts") the context whenever the tab is backgrounded or
+  // the phone is locked. We handle both. All start paths are idempotent.
   useEffect(() => {
     const unlock = (): void => {
       const ctx = ensureCtx()
       if (!ctx) return
+      // iOS: play a 1-sample silent buffer within the gesture to prime output.
+      try {
+        const buf = ctx.createBuffer(1, 1, 22050)
+        const src = ctx.createBufferSource()
+        src.buffer = buf
+        src.connect(ctx.destination)
+        src.start(0)
+      } catch {
+        /* ignore — best-effort prime */
+      }
       void ctx.resume().then(() => tryStartMusic())
+    }
+    // Re-resume when we come back to the foreground (iOS suspends on lock/switch).
+    const onVisible = (): void => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return
+      }
+      const ctx = ctxRef.current
+      if (ctx && ctx.state !== 'running') {
+        void ctx.resume().then(() => tryStartMusic())
+      }
     }
     const opts: AddEventListenerOptions = { passive: true }
     window.addEventListener('pointerdown', unlock, opts)
+    window.addEventListener('touchend', unlock, opts)
     window.addEventListener('touchstart', unlock, opts)
     window.addEventListener('keydown', unlock)
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('pageshow', onVisible)
     return () => {
       window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('touchend', unlock)
       window.removeEventListener('touchstart', unlock)
       window.removeEventListener('keydown', unlock)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('pageshow', onVisible)
     }
   }, [ensureCtx, tryStartMusic])
 
