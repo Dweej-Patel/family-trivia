@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGame, useCategories } from '../../store/gameStore'
 import type { Difficulty, Question, QuestionType } from '../../types'
@@ -7,6 +7,7 @@ import { Card } from '../ui/Card'
 import { Chip } from '../ui/Chip'
 
 const ALL = '__all__'
+const PAGE_SIZE = 12
 
 const DIFFICULTIES: { value: Difficulty; label: string; emoji: string }[] = [
   { value: 'easy', label: 'Easy', emoji: '🟢' },
@@ -109,7 +110,9 @@ export function LibraryScreen() {
   const categories = useCategories()
 
   const [filterCategory, setFilterCategory] = useState<string>(ALL)
+  const [filterDifficulty, setFilterDifficulty] = useState<Difficulty | typeof ALL>(ALL)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [toast, setToast] = useState<Toast | null>(null)
 
@@ -122,10 +125,27 @@ export function LibraryScreen() {
     const needle = search.trim().toLowerCase()
     return questions.filter((q) => {
       if (filterCategory !== ALL && q.category !== filterCategory) return false
-      if (needle && !q.prompt.toLowerCase().includes(needle)) return false
+      if (filterDifficulty !== ALL && q.difficulty !== filterDifficulty) return false
+      if (
+        needle &&
+        !q.prompt.toLowerCase().includes(needle) &&
+        !q.options.some((o) => o.toLowerCase().includes(needle))
+      ) {
+        return false
+      }
       return true
     })
-  }, [questions, filterCategory, search])
+  }, [questions, filterCategory, filterDifficulty, search])
+
+  // ── Pagination ────────────────────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
+  // Reset to the first page whenever the filters/search change.
+  useEffect(() => {
+    setPage(1)
+  }, [filterCategory, filterDifficulty, search])
+  const safePage = Math.min(page, totalPages)
+  const pageStart = (safePage - 1) * PAGE_SIZE
+  const paged = visible.slice(pageStart, pageStart + PAGE_SIZE)
 
   // ── Editor open helpers ───────────────────────────────────────────────────
   const openNew = () => setDraft(blankDraft())
@@ -299,25 +319,56 @@ export function LibraryScreen() {
             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
               setSearch(e.target.value)
             }
-            placeholder="Search prompts…"
+            placeholder="Search questions & answers…"
             className="min-w-[12rem] flex-1 rounded-2xl border-2 border-white/25 bg-white/10 px-4 py-2 font-body text-sm font-semibold text-white outline-none placeholder:text-white/40 focus-visible:ring-4 focus-visible:ring-white/40"
           />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Chip
-            label="All"
-            emoji="✨"
-            selected={filterCategory === ALL}
-            onClick={() => setFilterCategory(ALL)}
-          />
-          {categories.map((cat) => (
+
+        {/* Category filter */}
+        <div>
+          <span className="mb-1.5 block font-body text-xs font-bold uppercase tracking-wide text-white/50">
+            Category
+          </span>
+          <div className="flex flex-wrap gap-2">
             <Chip
-              key={cat}
-              label={cat}
-              selected={filterCategory === cat}
-              onClick={() => setFilterCategory(cat)}
+              label="All"
+              emoji="✨"
+              selected={filterCategory === ALL}
+              onClick={() => setFilterCategory(ALL)}
             />
-          ))}
+            {categories.map((cat) => (
+              <Chip
+                key={cat}
+                label={cat}
+                selected={filterCategory === cat}
+                onClick={() => setFilterCategory(cat)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Difficulty filter */}
+        <div>
+          <span className="mb-1.5 block font-body text-xs font-bold uppercase tracking-wide text-white/50">
+            Difficulty
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <Chip
+              label="All"
+              emoji="✨"
+              selected={filterDifficulty === ALL}
+              onClick={() => setFilterDifficulty(ALL)}
+            />
+            {DIFFICULTIES.map((d) => (
+              <Chip
+                key={d.value}
+                label={d.label}
+                emoji={d.emoji}
+                selected={filterDifficulty === d.value}
+                onClick={() => setFilterDifficulty(d.value)}
+              />
+            ))}
+          </div>
         </div>
       </Card>
 
@@ -342,6 +393,14 @@ export function LibraryScreen() {
         </Button>
       </div>
 
+      {/* Results count */}
+      {visible.length > 0 && (
+        <p className="font-body text-sm font-semibold text-white/60">
+          Showing {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, visible.length)} of{' '}
+          {visible.length} question{visible.length === 1 ? '' : 's'}
+        </p>
+      )}
+
       {/* Question list */}
       <div className="flex flex-col gap-4">
         {visible.length === 0 ? (
@@ -359,7 +418,7 @@ export function LibraryScreen() {
           </Card>
         ) : (
           <AnimatePresence mode="popLayout">
-            {visible.map((q) => (
+            {paged.map((q) => (
               <motion.div
                 key={q.id}
                 layout
@@ -433,6 +492,31 @@ export function LibraryScreen() {
           </AnimatePresence>
         )}
       </div>
+
+      {/* Pagination controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 pt-1">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={safePage <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            ← Prev
+          </Button>
+          <span className="font-display text-sm font-bold text-white/80">
+            Page {safePage} of {totalPages}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={safePage >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Next →
+          </Button>
+        </div>
+      )}
 
       {/* Editor modal */}
       <AnimatePresence>
