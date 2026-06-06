@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion'
+import { useEffect, useState } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 
 interface Blob {
   className: string
@@ -57,43 +58,69 @@ const SPARKLES: Sparkle[] = [
   { emoji: '✨', className: 'bottom-[18%] right-[22%] text-2xl', duration: 10 },
 ]
 
+/** True on phone-sized screens, where animating large blurred layers is too
+ *  expensive (it forces the GPU to re-rasterize the blur every frame). */
+function useIsSmallScreen(): boolean {
+  const [small, setSmall] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia('(max-width: 768px)')
+    const update = () => setSmall(mq.matches)
+    update()
+    mq.addEventListener?.('change', update)
+    return () => mq.removeEventListener?.('change', update)
+  }, [])
+  return small
+}
+
 export function AnimatedBackground() {
+  const reduceMotion = useReducedMotion()
+  const small = useIsSmallScreen()
+  // Animate the heavy blurred layers only where it's cheap: larger screens with
+  // motion allowed. On phones we keep the same look but render it statically.
+  const animate = !reduceMotion && !small
+
+  // Fewer blurred layers on phones (each blurred layer is a compositing cost).
+  const blobs = small ? BLOBS.slice(0, 2) : BLOBS
+
   return (
     <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden">
-      {/* Panning gradient base */}
-      <div className="animate-gradient-pan absolute inset-0 bg-[length:400%_400%] bg-gradient-to-br from-grape via-bubble to-tangerine opacity-90" />
+      {/* Static gradient base — animating background-position repaints the whole
+          screen every frame, which is the biggest mobile cost, so we don't. */}
+      <div className="absolute inset-0 bg-gradient-to-br from-grape via-bubble to-tangerine opacity-90" />
       <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-transparent to-ink/40" />
 
       {/* Floating blurred blobs */}
-      {BLOBS.map((blob, i) => (
+      {blobs.map((blob, i) => (
         <motion.div
           key={i}
-          className={`absolute rounded-full blur-3xl opacity-40 ${blob.className}`}
-          style={{ backgroundColor: blob.color }}
-          animate={{ x: blob.x, y: blob.y, scale: blob.scale }}
-          transition={{
-            duration: blob.duration,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
+          className={`absolute rounded-full opacity-40 ${small ? 'blur-2xl' : 'blur-3xl'} ${blob.className}`}
+          style={{ backgroundColor: blob.color, willChange: animate ? 'transform' : undefined }}
+          animate={animate ? { x: blob.x, y: blob.y, scale: blob.scale } : undefined}
+          transition={
+            animate
+              ? { duration: blob.duration, repeat: Infinity, ease: 'easeInOut' }
+              : undefined
+          }
         />
       ))}
 
-      {/* Drifting sparkles */}
-      {SPARKLES.map((sparkle, i) => (
-        <motion.div
-          key={`s-${i}`}
-          className={`absolute select-none opacity-70 ${sparkle.className}`}
-          animate={{ y: [0, -18, 0], rotate: [0, 12, -12, 0], opacity: [0.4, 0.9, 0.4] }}
-          transition={{
-            duration: sparkle.duration,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-        >
-          {sparkle.emoji}
-        </motion.div>
-      ))}
+      {/* Drifting sparkles — animation only; skip entirely on phones / reduced motion */}
+      {animate &&
+        SPARKLES.map((sparkle, i) => (
+          <motion.div
+            key={`s-${i}`}
+            className={`absolute select-none opacity-70 ${sparkle.className}`}
+            animate={{ y: [0, -18, 0], rotate: [0, 12, -12, 0], opacity: [0.4, 0.9, 0.4] }}
+            transition={{
+              duration: sparkle.duration,
+              repeat: Infinity,
+              ease: 'easeInOut',
+            }}
+          >
+            {sparkle.emoji}
+          </motion.div>
+        ))}
     </div>
   )
 }

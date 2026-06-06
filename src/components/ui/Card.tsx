@@ -15,7 +15,9 @@ export function Card({ children, className = '', onClick }: CardProps) {
       transition={{ type: 'spring', stiffness: 400, damping: 26 }}
       className={[
         'rounded-3xl p-6',
-        'bg-white/10 backdrop-blur-md border border-white/20 shadow-xl',
+        // backdrop-blur is costly on mobile Safari, so the frosted-glass effect
+        // is desktop-only; phones get a slightly more opaque panel instead.
+        'bg-white/[0.14] md:bg-white/10 md:backdrop-blur-md border border-white/20 shadow-xl',
         onClick ? 'cursor-pointer' : '',
         className,
       ].join(' ')}

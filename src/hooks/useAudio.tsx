@@ -45,6 +45,41 @@ function getAudioContextCtor(): AnyAudioContext | null {
   return w.AudioContext ?? w.webkitAudioContext ?? null
 }
 
+/** iOS (incl. iPadOS, which masquerades as Mac) — where the silent switch
+ *  mutes Web Audio unless we route through a media element. */
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  const isiDevice = /iPad|iPhone|iPod/.test(ua)
+  const isiPadOS = navigator.platform === 'MacIntel' && (navigator.maxTouchPoints ?? 0) > 1
+  return isiDevice || isiPadOS
+}
+
+// A short silent WAV, created once, used as the looping media-element source.
+// Playing an <audio> element promotes iOS Safari's audio session to the media
+// channel so Web Audio becomes audible even when the ring/silent switch is on.
+let silentLoopUrl: string | null = null
+function getSilentLoopUrl(): string | null {
+  if (typeof document === 'undefined') return null
+  if (silentLoopUrl) return silentLoopUrl
+  const sampleRate = 8000
+  const numSamples = Math.floor(sampleRate * 0.5) // 0.5s of silence
+  const dataSize = numSamples // 8-bit mono => 1 byte/sample
+  const buf = new ArrayBuffer(44 + dataSize)
+  const view = new DataView(buf)
+  const wstr = (o: number, s: string) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i))
+  }
+  wstr(0, 'RIFF'); view.setUint32(4, 36 + dataSize, true); wstr(8, 'WAVE')
+  wstr(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true)
+  view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate, true); view.setUint16(32, 1, true)
+  view.setUint16(34, 8, true); wstr(36, 'data'); view.setUint32(40, dataSize, true)
+  for (let i = 0; i < numSamples; i++) view.setUint8(44 + i, 128) // unsigned 8-bit silence
+  silentLoopUrl = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }))
+  return silentLoopUrl
+}
+
 export function AudioProvider({
   children,
 }: {
@@ -56,6 +91,12 @@ export function AudioProvider({
 
   const ctxRef = useRef<AudioContext | null>(null)
   const masterRef = useRef<GainNode | null>(null)
+
+  // iOS-only: a looping silent media element that lets Web Audio play over the
+  // ring/silent switch. `iosUnlocked` makes the gesture handler a cheap no-op
+  // after the first successful unlock (avoids per-tap work that caused lag).
+  const silentElRef = useRef<HTMLAudioElement | null>(null)
+  const audioUnlockedRef = useRef<boolean>(false)
 
   // Music bookkeeping so we can cleanly stop & avoid double-starts.
   const musicIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -508,13 +549,45 @@ export function AudioProvider({
     tryStartMusic()
   }, [stopMusic, tryStartMusic])
 
+  // iOS: start the looping silent media element (lazily). Once it's playing,
+  // iOS routes Web Audio through the media channel, so sound plays even with
+  // the ring/silent switch on. No-op off iOS or while muted.
+  const playSilentLoop = useCallback((): void => {
+    if (!isIOS() || mutedRef.current) return
+    try {
+      if (!silentElRef.current) {
+        const url = getSilentLoopUrl()
+        if (!url) return
+        const el = new Audio(url)
+        el.loop = true
+        el.preload = 'auto'
+        el.setAttribute('playsinline', '')
+        ;(el as unknown as { playsInline: boolean }).playsInline = true
+        silentElRef.current = el
+      }
+      void silentElRef.current.play().catch(() => {})
+    } catch {
+      /* ignore — best-effort */
+    }
+  }, [])
+
+  const pauseSilentLoop = useCallback((): void => {
+    try {
+      silentElRef.current?.pause()
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
   // Unlock audio on the first user gesture. Desktop browsers just need the
-  // AudioContext resumed, but iOS Safari is stricter: it additionally needs a
-  // silent buffer played *inside* the gesture to open the output path, and it
-  // re-suspends ("interrupts") the context whenever the tab is backgrounded or
-  // the phone is locked. We handle both. All start paths are idempotent.
+  // AudioContext resumed; iOS Safari additionally needs a silent buffer played
+  // *inside* the gesture, plus the silent media loop to beat the silent switch.
+  // It also re-suspends the context when the tab/phone is backgrounded. After
+  // the first successful unlock the handler short-circuits (so it's not doing
+  // work on every tap — that was a source of mobile lag).
   useEffect(() => {
     const unlock = (): void => {
+      if (audioUnlockedRef.current) return // already unlocked — cheap no-op
       const ctx = ensureCtx()
       if (!ctx) return
       // iOS: play a 1-sample silent buffer within the gesture to prime output.
@@ -527,7 +600,11 @@ export function AudioProvider({
       } catch {
         /* ignore — best-effort prime */
       }
-      void ctx.resume().then(() => tryStartMusic())
+      playSilentLoop()
+      void ctx.resume().then(() => {
+        audioUnlockedRef.current = true
+        tryStartMusic()
+      })
     }
     // Re-resume when we come back to the foreground (iOS suspends on lock/switch).
     const onVisible = (): void => {
@@ -538,23 +615,22 @@ export function AudioProvider({
       if (ctx && ctx.state !== 'running') {
         void ctx.resume().then(() => tryStartMusic())
       }
+      playSilentLoop()
     }
     const opts: AddEventListenerOptions = { passive: true }
     window.addEventListener('pointerdown', unlock, opts)
     window.addEventListener('touchend', unlock, opts)
-    window.addEventListener('touchstart', unlock, opts)
     window.addEventListener('keydown', unlock)
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('pageshow', onVisible)
     return () => {
       window.removeEventListener('pointerdown', unlock)
       window.removeEventListener('touchend', unlock)
-      window.removeEventListener('touchstart', unlock)
       window.removeEventListener('keydown', unlock)
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('pageshow', onVisible)
     }
-  }, [ensureCtx, tryStartMusic])
+  }, [ensureCtx, tryStartMusic, playSilentLoop])
 
   // ── Public: mute toggle ────────────────────────────────────────────────────
   const toggleMute = useCallback((): void => {
@@ -563,23 +639,37 @@ export function AudioProvider({
       storage.saveMuted(next)
       mutedRef.current = next
       if (next) {
-        // Going muted: kill any music immediately (but remember we want it).
+        // Going muted: kill music and release the iOS media session so other
+        // apps' audio can resume (but remember music was wanted).
         const wanted = wantsMusicRef.current
         stopMusic()
+        pauseSilentLoop()
         wantsMusicRef.current = wanted
       } else {
-        // Unmuting on a gesture: resume the context and bring music back.
+        // Unmuting on a gesture: resume the context, retake the iOS media
+        // session, and bring music back.
         ensureCtx()
+        playSilentLoop()
         tryStartMusic()
       }
       return next
     })
-  }, [ensureCtx, stopMusic, tryStartMusic])
+  }, [ensureCtx, stopMusic, tryStartMusic, playSilentLoop, pauseSilentLoop])
 
   // Cleanup on unmount.
   useEffect(() => {
     return () => {
       stopMusic()
+      const el = silentElRef.current
+      if (el) {
+        try {
+          el.pause()
+          el.src = ''
+        } catch {
+          /* ignore */
+        }
+        silentElRef.current = null
+      }
       const ctx = ctxRef.current
       if (ctx) {
         void ctx.close()
