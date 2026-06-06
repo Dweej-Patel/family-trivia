@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useGame, useCategories } from '../../store/gameStore'
+import { useGame, useCategories, planQuestions } from '../../store/gameStore'
 import { useAudio } from '../../hooks/useAudio'
 import type { Difficulty } from '../../types'
 import { Button } from '../ui/Button'
@@ -30,8 +30,15 @@ export function ConfigScreen() {
   const config = useGame((s) => s.config)
   const setConfig = useGame((s) => s.setConfig)
   const startGame = useGame((s) => s.startGame)
+  const questions = useGame((s) => s.questions)
+  const players = useGame((s) => s.players)
   const categories = useCategories()
   const { play } = useAudio()
+
+  // Fair split: deck size snaps to a multiple of the player count so everyone
+  // answers the same number of questions.
+  const playerCount = Math.max(1, players.length)
+  const plan = planQuestions(questions, config, playerCount)
 
   const toggleCategory = (cat: string) => {
     const has = config.categories.includes(cat)
@@ -123,6 +130,11 @@ export function ConfigScreen() {
               />
             ))}
           </div>
+          <p className="font-body text-sm font-semibold text-sunny">
+            {playerCount === 1
+              ? `🎯 ${plan.total} questions`
+              : `🎯 ${plan.total} questions • ${plan.perPlayer} each for ${playerCount} players`}
+          </p>
         </Card>
       </motion.div>
 

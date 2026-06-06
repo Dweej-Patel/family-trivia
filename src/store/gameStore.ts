@@ -18,8 +18,8 @@ const initialQuestions = storage.loadQuestions() ?? starterQuestions
 const initialPlayers = storage.loadPlayers() ?? []
 const initialConfig = { ...DEFAULT_CONFIG, ...(storage.loadConfig() ?? {}) }
 
-/** Build the play deck from the library, honoring category/difficulty filters. */
-function buildDeck(questions: Question[], config: GameConfig): string[] {
+/** Apply the category/difficulty filters, never returning an empty pool. */
+function filterPool(questions: Question[], config: GameConfig): Question[] {
   let pool = questions
   if (config.categories.length > 0) {
     pool = pool.filter((q) => config.categories.includes(q.category))
@@ -27,9 +27,44 @@ function buildDeck(questions: Question[], config: GameConfig): string[] {
   if (config.difficulties.length > 0) {
     pool = pool.filter((q) => config.difficulties.includes(q.difficulty))
   }
-  if (pool.length === 0) pool = questions // never produce an empty game
+  return pool.length === 0 ? questions : pool
+}
+
+/**
+ * Work out a *fair* game size: every player answers the same number of
+ * questions. We snap the requested total to the nearest multiple of the player
+ * count, then cap it at the largest multiple the available pool can fill.
+ *
+ * Returns the actual `total` questions, the `perPlayer` count, and `poolSize`.
+ */
+export function planQuestions(
+  questions: Question[],
+  config: GameConfig,
+  playerCount: number,
+): { total: number; perPlayer: number; poolSize: number } {
+  const pool = filterPool(questions, config)
+  const pc = Math.max(1, playerCount) // solo play counts as 1
+  const target = Math.max(1, config.questionCount)
+  const perPlayerReq = Math.max(1, Math.round(target / pc))
+  const desired = perPlayerReq * pc
+  // Largest multiple of `pc` the pool can actually fill.
+  const maxByPool = Math.floor(pool.length / pc) * pc
+  // If the pool can't even give everyone one question, fall back to its size.
+  const total = maxByPool >= pc ? Math.min(desired, maxByPool) : pool.length
+  return { total, perPlayer: Math.floor(total / pc), poolSize: pool.length }
+}
+
+/** Build the play deck — length is divisible by the player count so the turn
+ *  rotation gives every player an equal number of questions. */
+function buildDeck(
+  questions: Question[],
+  config: GameConfig,
+  playerCount: number,
+): string[] {
+  const pool = filterPool(questions, config)
+  const { total } = planQuestions(questions, config, playerCount)
   return shuffle(pool)
-    .slice(0, Math.max(1, config.questionCount))
+    .slice(0, total)
     .map((q) => q.id)
 }
 
@@ -119,7 +154,7 @@ export const useGame = create<GameState>((set) => ({
 
   startGame: () =>
     set((s) => {
-      const deck = buildDeck(s.questions, s.config)
+      const deck = buildDeck(s.questions, s.config, s.players.length)
       const players = s.players.map((p) => ({ ...p, score: 0 }))
       storage.savePlayers(players)
       return {
