@@ -10,6 +10,7 @@ import {
   type Unsubscribe,
 } from 'firebase/database'
 import { db, ensureSignedIn, connectDb } from '../lib/firebase'
+import { storage } from '../lib/storage'
 import type {
   Pacing,
   PlayerAnswer,
@@ -32,6 +33,35 @@ function roomExists(code: string): Promise<boolean> {
   return get(ref(db, `rooms/${code}/meta`)).then((s) => s.exists())
 }
 
+// ─── Orphaned-room cleanup ─────────────────────────────────────────────────
+// We can't list all rooms (the rules forbid it, by design), so each device
+// remembers the rooms IT created and deletes its own stale ones the next time
+// it hosts. This cleans up rooms left behind when a host hard-closes their tab.
+const ROOM_TTL_MS = 2 * 60 * 60 * 1000 // 2 hours
+
+function recordMyRoom(code: string): void {
+  const rooms = storage.loadMyRooms().filter((r) => r.code !== code)
+  rooms.push({ code, ts: Date.now() })
+  storage.saveMyRooms(rooms)
+}
+
+function forgetMyRoom(code: string): void {
+  storage.saveMyRooms(storage.loadMyRooms().filter((r) => r.code !== code))
+}
+
+/** Delete this device's own rooms that are older than the TTL (orphans from a
+ *  crashed/closed session). Only touches rooms we created — never enumerates. */
+async function sweepStaleRooms(): Promise<void> {
+  const now = Date.now()
+  const rooms = storage.loadMyRooms()
+  const stale = rooms.filter((r) => now - r.ts > ROOM_TTL_MS)
+  if (stale.length === 0) return
+  await Promise.all(
+    stale.map((r) => remove(ref(db, `rooms/${r.code}`)).catch(() => {})),
+  )
+  storage.saveMyRooms(rooms.filter((r) => now - r.ts <= ROOM_TTL_MS))
+}
+
 export interface CreateRoomOpts {
   pacing: Pacing
   timerSeconds: number
@@ -44,6 +74,7 @@ export async function createRoom(
 ): Promise<{ code: string; hostId: string }> {
   connectDb() // re-open the connection in case a previous session closed it
   const hostId = await ensureSignedIn()
+  await sweepStaleRooms() // clean up any orphans we left behind before
   for (let attempt = 0; attempt < 6; attempt++) {
     const code = generateRoomCode()
     if (await roomExists(code)) continue
@@ -56,11 +87,12 @@ export async function createRoom(
       totalQuestions: opts.totalQuestions,
       createdAt: serverTimestamp(),
     })
+    recordMyRoom(code) // remember it so we can clean it up later if abandoned
     // NOTE: we deliberately do NOT auto-delete the room when the host's
     // connection drops — a momentary blip must never end everyone's game. The
-    // host's listeners auto-recover on reconnect; the room is removed only when
-    // the host explicitly leaves/ends (closeRoom). The cost is that a host who
-    // hard-closes their tab leaves a tiny orphaned room, which is harmless.
+    // host's listeners auto-recover on reconnect; the room is removed when the
+    // host explicitly leaves/ends (closeRoom), and any orphan from a hard tab
+    // close is swept by sweepStaleRooms() next time this device hosts.
     return { code, hostId }
   }
   throw new Error('Could not allocate a room code — please try again.')
@@ -246,6 +278,7 @@ export function restartRoom(
 }
 
 export function closeRoom(code: string): Promise<void> {
+  forgetMyRoom(code) // cleanly closed — no need to track it for sweeping
   return remove(ref(db, `rooms/${code}`))
 }
 

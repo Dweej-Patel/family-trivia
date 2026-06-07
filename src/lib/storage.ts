@@ -6,7 +6,14 @@ const KEYS = {
   players: 'ft.players.v1',
   config: 'ft.config.v1',
   muted: 'ft.muted.v1',
+  myRooms: 'ft.myRooms.v1',
 } as const
+
+/** Rooms this device has hosted, so we can clean up stale ones we left behind. */
+export interface HostedRoom {
+  code: string
+  ts: number
+}
 
 function read<T>(key: string): T | null {
   try {
@@ -37,4 +44,7 @@ export const storage = {
 
   loadMuted: () => read<boolean>(KEYS.muted) ?? false,
   saveMuted: (m: boolean) => write(KEYS.muted, m),
+
+  loadMyRooms: () => read<HostedRoom[]>(KEYS.myRooms) ?? [],
+  saveMyRooms: (rooms: HostedRoom[]) => write(KEYS.myRooms, rooms),
 }
