@@ -31,6 +31,12 @@ function filterPool(questions: Question[], config: GameConfig): Question[] {
   return pool.length === 0 ? questions : pool
 }
 
+/** How many questions the current category/difficulty filters can supply —
+ *  the ceiling for a custom question count. */
+export function filteredPoolSize(questions: Question[], config: GameConfig): number {
+  return filterPool(questions, config).length
+}
+
 /**
  * Work out a *fair* game size: every player answers the same number of
  * questions. We snap the requested total to the nearest multiple of the player

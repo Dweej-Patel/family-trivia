@@ -1,5 +1,11 @@
+import { useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { useGame, useCategories, selectQuestions } from '../../store/gameStore'
+import {
+  useGame,
+  useCategories,
+  selectQuestions,
+  filteredPoolSize,
+} from '../../store/gameStore'
 import { useMpStore } from '../../multiplayer/mpStore'
 import { updateRoomSettings } from '../../multiplayer/room'
 import { useAudio } from '../../hooks/useAudio'
@@ -8,6 +14,7 @@ import type { Pacing } from '../../multiplayer/types'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Chip } from '../ui/Chip'
+import { ChipNumberInput } from '../ui/ChipNumberInput'
 
 const DIFFICULTIES: { value: Difficulty; label: string; emoji: string }[] = [
   { value: 'easy', label: 'Easy', emoji: '🟢' },
@@ -17,6 +24,8 @@ const DIFFICULTIES: { value: Difficulty; label: string; emoji: string }[] = [
 
 const COUNT_OPTIONS = [5, 10, 15, 20]
 const TIMER_OPTIONS = [10, 20, 30]
+const TIMER_MIN = 5
+const TIMER_MAX = 300
 
 const PACING_OPTIONS: {
   value: Pacing
@@ -57,6 +66,13 @@ export function MpHostSetupScreen() {
   // When a room is already live (the host came back from the lobby to tweak
   // settings), this screen EDITS that room instead of creating a new one.
   const editingCode = useMpStore((s) => s.hostRoomCode)
+
+  // The filters cap how many questions a game can have. If tightening the
+  // filters drops the pool below the chosen count, auto-adjust it down.
+  const poolSize = filteredPoolSize(questions, config)
+  useEffect(() => {
+    if (config.questionCount > poolSize) setConfig({ questionCount: poolSize })
+  }, [poolSize, config.questionCount, setConfig])
 
   const toggleCategory = (cat: string) => {
     const has = config.categories.includes(cat)
@@ -155,12 +171,22 @@ export function MpHostSetupScreen() {
                 key={n}
                 label={String(n)}
                 selected={config.questionCount === n}
-                onClick={() => setConfig({ questionCount: n })}
+                onClick={() => setConfig({ questionCount: Math.min(n, poolSize) })}
               />
             ))}
+            <ChipNumberInput
+              active={!COUNT_OPTIONS.includes(config.questionCount)}
+              value={config.questionCount}
+              min={1}
+              max={poolSize}
+              onCommit={(n) => setConfig({ questionCount: n })}
+            />
           </div>
           <p className="font-body text-sm font-semibold text-sunny">
-            🎯 {config.questionCount} questions
+            🎯 {config.questionCount} questions{' '}
+            <span className="text-white/60">
+              · {poolSize} available with these filters
+            </span>
           </p>
         </Card>
       </motion.div>
@@ -221,6 +247,14 @@ export function MpHostSetupScreen() {
                   onClick={() => setConfig({ timerSeconds: s })}
                 />
               ))}
+              <ChipNumberInput
+                active={!TIMER_OPTIONS.includes(config.timerSeconds)}
+                value={config.timerSeconds}
+                min={TIMER_MIN}
+                max={TIMER_MAX}
+                suffix="s"
+                onCommit={(n) => setConfig({ timerSeconds: n })}
+              />
             </div>
           </Card>
         </motion.div>
