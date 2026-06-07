@@ -4,6 +4,7 @@ import { useGame } from '../../store/gameStore'
 import { useMpStore } from '../../multiplayer/mpStore'
 import { usePlayerGame } from '../../multiplayer/usePlayerGame'
 import { leaveRoom } from '../../multiplayer/room'
+import { MANUAL_BONUS_WINDOW } from '../../multiplayer/scoring'
 import { useAudio } from '../../hooks/useAudio'
 import { fireConfetti } from '../ui/ConfettiBurst'
 import { Button } from '../ui/Button'
@@ -126,18 +127,17 @@ function ActivePlayer({ code, uid }: ActivePlayerProps) {
     }
   }, [status, myRank, play])
 
-  // ── Live countdown for timed questions ──
+  // ── Live countdown: the question timer (timed) or the speed-bonus window
+  //    (manual mode still rewards quick answers for ~30s). ──
   const [remaining, setRemaining] = useState<number | null>(null)
   useEffect(() => {
-    if (status !== 'question' || pacing !== 'timed' || !question) {
+    if (status !== 'question' || !question) {
       setRemaining(null)
       return
     }
+    const windowSec = pacing === 'timed' ? question.timerSeconds : MANUAL_BONUS_WINDOW
     const compute = () =>
-      Math.max(
-        0,
-        question.timerSeconds - (Date.now() - question.startedAt) / 1000,
-      )
+      Math.max(0, windowSec - (Date.now() - question.startedAt) / 1000)
     setRemaining(compute())
     const id = window.setInterval(() => setRemaining(compute()), 200)
     return () => window.clearInterval(id)
@@ -290,6 +290,20 @@ function ActivePlayer({ code, uid }: ActivePlayerProps) {
             {Math.ceil(remaining)}s
           </motion.span>
         )}
+        {pacing === 'manual' &&
+          remaining !== null &&
+          remaining > 0 &&
+          status === 'question' &&
+          !locked && (
+            <motion.span
+              initial={{ scale: 1.2 }}
+              animate={{ scale: 1 }}
+              className="rounded-full bg-sunny/25 px-3 py-1 font-display text-base tabular-nums text-sunny"
+              title="Answer quickly for bonus points"
+            >
+              ⚡ +{Math.round((remaining / MANUAL_BONUS_WINDOW) * 100)}
+            </motion.span>
+          )}
       </div>
 
       {/* ── Prompt ── */}
