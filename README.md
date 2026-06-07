@@ -7,7 +7,7 @@ winner's podium.
 
 **▶ Play it live:** https://dweej-patel.github.io/family-trivia/
 
-![Home](docs/home.png)
+![Home](docs/home.png?v=2)
 
 ## ✨ Features
 
