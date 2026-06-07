@@ -103,6 +103,30 @@ export function MpHostScreen() {
     return () => window.clearInterval(id)
   }, [status, pacing, currentIndex, timerSeconds])
 
+  // ── Copy the invite link to the clipboard (with a brief "copied" state) ────
+  const [copied, setCopied] = useState(false)
+  const copyLink = async (url: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = url
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.focus()
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      /* clipboard blocked — ignore */
+    }
+  }
+
   // ── Navigation helpers (delete the room, then drop the connection) ─────────
   const leaveTo = (screen: 'mode' | 'home' | 'mpHostSetup') => {
     close()
@@ -197,7 +221,22 @@ export function MpHostScreen() {
             <div className="rounded-2xl bg-white p-3 shadow-playful">
               <QRCodeSVG value={joinUrl} size={200} level="M" />
             </div>
-            <p className="break-all font-body text-sm text-white/50">{joinUrl}</p>
+
+            <div className="flex w-full flex-col items-center gap-2">
+              <p className="break-all font-body text-sm text-white/50">{joinUrl}</p>
+              <motion.button
+                onClick={() => copyLink(joinUrl)}
+                whileTap={{ scale: 0.95 }}
+                className={[
+                  'inline-flex items-center gap-2 rounded-2xl border px-4 py-2 font-display text-sm font-bold transition-colors',
+                  copied
+                    ? 'border-mint/50 bg-mint/20 text-mint'
+                    : 'border-white/25 bg-white/10 text-white hover:bg-white/20',
+                ].join(' ')}
+              >
+                {copied ? '✓ Link copied!' : '📋 Copy invite link'}
+              </motion.button>
+            </div>
           </Card>
 
           {/* Player roster */}
