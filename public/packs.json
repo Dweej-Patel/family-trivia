@@ -3,10 +3,10 @@
     {
       "id": "india",
       "name": "India Heritage Pack",
-      "emoji": "🇮🇳",
-      "description": "Indian heritage, geography, landmarks, food, general knowledge & Indian-American life — with Gujarat well represented.",
+      "emoji": "\ud83c\uddee\ud83c\uddf3",
+      "description": "Indian heritage, geography, landmarks, food, general knowledge & Indian-American life \u2014 with Gujarat well represented.",
       "file": "india-question-bank.json",
-      "count": 270
+      "count": 599
     }
   ]
 }
