@@ -57,7 +57,7 @@ export function HomeScreen() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.7, type: 'spring', stiffness: 200, damping: 20 }}
       >
-        Pass the screen, beat your family, and find out who really knows it all. 🎉
+        Beat your family and find out who really knows it all. 🎉
       </motion.p>
 
       <motion.div
@@ -66,8 +66,16 @@ export function HomeScreen() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.9, type: 'spring', stiffness: 220, damping: 22 }}
       >
-        <Button size="lg" fullWidth onClick={() => setScreen('setup')}>
+        <Button size="lg" fullWidth onClick={() => setScreen('mode')}>
           ▶ Play
+        </Button>
+        <Button
+          variant="secondary"
+          size="md"
+          fullWidth
+          onClick={() => setScreen('mpJoin')}
+        >
+          📱 Join a Game
         </Button>
         <Button
           variant="ghost"

@@ -11,6 +11,7 @@ const DEFAULT_CONFIG: GameConfig = {
   questionCount: 10,
   timerEnabled: true,
   timerSeconds: 20,
+  pacing: 'timed',
 }
 
 // Seed from localStorage when present, otherwise fall back to defaults.
@@ -52,6 +53,14 @@ export function planQuestions(
   // If the pool can't even give everyone one question, fall back to its size.
   const total = maxByPool >= pc ? Math.min(desired, maxByPool) : pool.length
   return { total, perPlayer: Math.floor(total / pc), poolSize: pool.length }
+}
+
+/** Pick the actual question objects for a game (filtered, shuffled, sliced to
+ *  questionCount). Used by multiplayer, which is simultaneous — every player
+ *  answers every question — so no per-player division is needed. */
+export function selectQuestions(questions: Question[], config: GameConfig): Question[] {
+  const pool = filterPool(questions, config)
+  return shuffle(pool).slice(0, Math.max(1, config.questionCount))
 }
 
 /** Build the play deck — length is divisible by the player count so the turn

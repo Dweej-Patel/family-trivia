@@ -2,12 +2,18 @@
 
 export type Screen =
   | 'home'
+  | 'mode' // pick single-device vs multiplayer
   | 'setup'
   | 'config'
   | 'playing'
   | 'roundScore'
   | 'results'
   | 'library'
+  // ── Multiplayer (Kahoot-style) ──
+  | 'mpHostSetup' // host configures the game
+  | 'mpHost' // host screen: lobby → questions → results
+  | 'mpJoin' // player enters room code + name
+  | 'mpPlayer' // player screen: lobby → answer → results
 
 export type Difficulty = 'easy' | 'medium' | 'hard'
 export type QuestionType = 'mc' | 'tf'
@@ -38,6 +44,7 @@ export interface GameConfig {
   questionCount: number // total questions in the game
   timerEnabled: boolean
   timerSeconds: number
+  pacing: 'timed' | 'manual' // multiplayer: auto-advance on a timer vs host taps next
 }
 
 export interface GameState {
