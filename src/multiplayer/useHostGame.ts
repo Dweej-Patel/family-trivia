@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Question } from '../types'
-import type { Pacing, RoomPlayer, RoomSnapshot, RoomStatus } from './types'
+import type {
+  Pacing,
+  PlayerAnswer,
+  RoomMeta,
+  RoomPlayer,
+  RoomQuestion,
+  RoomStatus,
+} from './types'
 import {
   createRoom,
   pushQuestion,
@@ -8,7 +15,10 @@ import {
   finishGame,
   restartRoom,
   closeRoom,
-  subscribeRoom,
+  subscribeMeta,
+  subscribePlayers,
+  subscribeQuestion,
+  subscribeQuestionAnswers,
 } from './room'
 import { scoreAnswer } from './scoring'
 
@@ -41,27 +51,41 @@ const REVEAL_AUTO_NEXT_MS = 4500
 /**
  * Host-authoritative game controller. The host holds the full deck (with the
  * correct answers), pushes the public question into the room, scores incoming
- * answers, and — in timed mode — auto-reveals and auto-advances.
+ * answers, and — in timed mode — auto-reveals and auto-advances. It listens only
+ * to meta, players, the current question, and the CURRENT question's answers.
  */
 export function useHostGame(
   deck: Question[],
   opts: { pacing: Pacing; timerSeconds: number },
 ): HostGame {
   const [code, setCode] = useState<string | null>(null)
-  const [snapshot, setSnapshot] = useState<RoomSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [meta, setMeta] = useState<RoomMeta | null>(null)
+  const [playersMap, setPlayersMap] = useState<Record<string, RoomPlayer>>({})
+  const [question, setQuestion] = useState<RoomQuestion | null>(null)
+  const [curAnswers, setCurAnswers] = useState<Record<string, PlayerAnswer>>({})
 
   const deckRef = useRef(deck)
   deckRef.current = deck
   const optsRef = useRef(opts)
   optsRef.current = opts
 
-  // Create the room exactly once, then subscribe to it.
+  // Latest live state in refs so the action callbacks stay stable.
+  const metaRef = useRef<RoomMeta | null>(null)
+  metaRef.current = meta
+  const playersMapRef = useRef<Record<string, RoomPlayer>>({})
+  playersMapRef.current = playersMap
+  const questionRef = useRef<RoomQuestion | null>(null)
+  questionRef.current = question
+  const curAnswersRef = useRef<Record<string, PlayerAnswer>>({})
+  curAnswersRef.current = curAnswers
+
+  // Create the room once, then subscribe to its slices.
   const createdRef = useRef(false)
   useEffect(() => {
     if (createdRef.current) return
     createdRef.current = true
-    let unsub: (() => void) | undefined
+    const unsubs: Array<() => void> = []
     createRoom({
       pacing: opts.pacing,
       timerSeconds: opts.timerSeconds,
@@ -69,33 +93,41 @@ export function useHostGame(
     })
       .then(({ code }) => {
         setCode(code)
-        unsub = subscribeRoom(code, setSnapshot)
+        unsubs.push(subscribeMeta(code, setMeta))
+        unsubs.push(subscribePlayers(code, setPlayersMap))
+        unsubs.push(subscribeQuestion(code, setQuestion))
       })
       .catch((e: unknown) =>
         setError(e instanceof Error ? e.message : 'Could not create the room.'),
       )
-    return () => unsub?.()
+    return () => unsubs.forEach((u) => u())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const meta = snapshot?.meta
   const status: RoomStatus | 'creating' = meta?.status ?? 'creating'
   const currentIndex = meta?.questionIndex ?? -1
   const currentQuestion = currentIndex >= 0 ? deck[currentIndex] : undefined
   const totalQuestions = deck.length
   const isLast = currentIndex >= 0 && currentIndex + 1 >= totalQuestions
 
-  const players = useMemo<HostPlayer[]>(() => {
-    const raw = snapshot?.players ?? {}
-    return Object.entries(raw)
-      .map(([id, p]) => ({ id, ...p }))
-      .sort((a, b) => b.score - a.score)
-  }, [snapshot])
+  // Only the current question's answers (re-subscribes as the question advances).
+  useEffect(() => {
+    if (!code || currentIndex < 0) {
+      setCurAnswers({})
+      return
+    }
+    return subscribeQuestionAnswers(code, currentIndex, setCurAnswers)
+  }, [code, currentIndex])
 
-  const answeredCount = useMemo(() => {
-    if (currentIndex < 0) return 0
-    return Object.keys(snapshot?.answers?.[currentIndex] ?? {}).length
-  }, [snapshot, currentIndex])
+  const players = useMemo<HostPlayer[]>(
+    () =>
+      Object.entries(playersMap)
+        .map(([id, p]) => ({ id, ...p }))
+        .sort((a, b) => b.score - a.score),
+    [playersMap],
+  )
+
+  const answeredCount = currentIndex < 0 ? 0 : Object.keys(curAnswers).length
 
   const pushIndex = useCallback(
     (index: number) => {
@@ -122,44 +154,48 @@ export function useHostGame(
   const advancedFromRef = useRef(-1)
 
   const reveal = useCallback(() => {
-    if (!code || !snapshot || !meta || meta.status !== 'question') return
-    const idx = meta.questionIndex
+    if (!code) return
+    const m = metaRef.current
+    if (!m || m.status !== 'question') return
+    const idx = m.questionIndex
     if (revealedForRef.current === idx) return
     revealedForRef.current = idx
     const q = deckRef.current[idx]
     if (!q) return
-    const answers = snapshot.answers?.[idx] ?? {}
-    const playersMap = snapshot.players ?? {}
-    const startedAt = snapshot.question?.startedAt ?? 0
+    const answers = curAnswersRef.current
+    const playerMap = playersMapRef.current
+    const startedAt = questionRef.current?.startedAt ?? 0
     const newScores: Record<string, number> = {}
     const results: Record<string, { correct: boolean; awarded: number }> = {}
     for (const [uid, ans] of Object.entries(answers)) {
       // Only score players still present — never resurrect a deleted player as
       // a nameless "ghost" by writing a score for an unknown id.
-      if (!playersMap[uid]) continue
+      if (!playerMap[uid]) continue
       const correct = ans.optionIndex === q.correctIndex
       const awarded = scoreAnswer({
         correct,
         difficulty: q.difficulty,
-        pacing: meta.pacing,
-        timerSeconds: meta.timerSeconds,
+        pacing: m.pacing,
+        timerSeconds: m.timerSeconds,
         startedAt,
         answeredAt: ans.answeredAt,
       })
       results[uid] = { correct, awarded }
-      newScores[uid] = (playersMap[uid]?.score ?? 0) + awarded
+      newScores[uid] = (playerMap[uid]?.score ?? 0) + awarded
     }
     void revealQuestion(code, idx, q.correctIndex, newScores, results)
-  }, [code, snapshot, meta])
+  }, [code])
 
   const next = useCallback(() => {
-    if (!code || !meta) return
-    const ni = meta.questionIndex + 1
-    if (advancedFromRef.current === meta.questionIndex) return
-    advancedFromRef.current = meta.questionIndex
+    if (!code) return
+    const m = metaRef.current
+    if (!m) return
+    if (advancedFromRef.current === m.questionIndex) return
+    advancedFromRef.current = m.questionIndex
+    const ni = m.questionIndex + 1
     if (ni >= deckRef.current.length) void finishGame(code)
     else pushIndex(ni)
-  }, [code, meta, pushIndex])
+  }, [code, pushIndex])
 
   const end = useCallback(() => {
     if (code) void finishGame(code)
@@ -170,10 +206,10 @@ export function useHostGame(
       if (!code) return
       revealedForRef.current = -1
       advancedFromRef.current = -1
-      const ids = Object.keys(snapshot?.players ?? {})
+      const ids = Object.keys(playersMapRef.current)
       void restartRoom(code, ids, newTotalQuestions)
     },
-    [code, snapshot],
+    [code],
   )
 
   const close = useCallback(() => {
@@ -185,15 +221,16 @@ export function useHostGame(
     if (!meta || meta.pacing !== 'timed') return
 
     if (meta.status === 'question') {
-      const startedAt = snapshot?.question?.startedAt
-      const numPlayers = Object.keys(snapshot?.players ?? {}).length
-      const numAnswers = Object.keys(snapshot?.answers?.[meta.questionIndex] ?? {}).length
-      // Everyone's in → reveal immediately.
-      if (numPlayers > 0 && numAnswers >= numPlayers) {
+      const startedAt = question?.startedAt
+      // Count only connected players — a dropped player shouldn't block reveal.
+      const activeCount = Object.values(playersMap).filter(
+        (p) => p.connected !== false,
+      ).length
+      const numAnswers = Object.keys(curAnswers).length
+      if (activeCount > 0 && numAnswers >= activeCount) {
         reveal()
         return
       }
-      // Otherwise reveal when the clock runs out.
       if (startedAt) {
         const msLeft = meta.timerSeconds * 1000 - (Date.now() - startedAt)
         const t = window.setTimeout(reveal, Math.max(0, msLeft) + 250)
@@ -205,7 +242,7 @@ export function useHostGame(
       const t = window.setTimeout(next, REVEAL_AUTO_NEXT_MS)
       return () => window.clearTimeout(t)
     }
-  }, [meta, snapshot, reveal, next])
+  }, [meta, question, playersMap, curAnswers, reveal, next])
 
   return {
     code,

@@ -12,10 +12,11 @@ import {
 import { db, ensureSignedIn, connectDb } from '../lib/firebase'
 import type {
   Pacing,
+  PlayerAnswer,
   PlayerIdentity,
   RoomMeta,
+  RoomPlayer,
   RoomQuestion,
-  RoomSnapshot,
 } from './types'
 
 // Room-code alphabet with ambiguous characters (O/0, I/1) removed.
@@ -118,12 +119,58 @@ export function onConnectionChange(cb: (connected: boolean) => void): Unsubscrib
   return onValue(ref(db, '.info/connected'), (s) => cb(s.val() === true))
 }
 
-export function subscribeRoom(
+// ─── Narrow subscriptions ──────────────────────────────────────────────────
+// Both sides listen only to the slices they need (all multiplexed over the one
+// connection), so a single answer no longer re-downloads the whole room to
+// everyone. Players never receive other players' raw answers.
+
+export function subscribeMeta(
   code: string,
-  cb: (snap: RoomSnapshot | null) => void,
+  cb: (meta: RoomMeta | null) => void,
 ): Unsubscribe {
-  return onValue(ref(db, `rooms/${code}`), (s) =>
-    cb(s.exists() ? (s.val() as RoomSnapshot) : null),
+  return onValue(ref(db, `rooms/${code}/meta`), (s) =>
+    cb(s.exists() ? (s.val() as RoomMeta) : null),
+  )
+}
+
+export function subscribeQuestion(
+  code: string,
+  cb: (q: RoomQuestion | null) => void,
+): Unsubscribe {
+  return onValue(ref(db, `rooms/${code}/question`), (s) =>
+    cb(s.exists() ? (s.val() as RoomQuestion) : null),
+  )
+}
+
+export function subscribePlayers(
+  code: string,
+  cb: (players: Record<string, RoomPlayer>) => void,
+): Unsubscribe {
+  return onValue(ref(db, `rooms/${code}/players`), (s) =>
+    cb(s.exists() ? (s.val() as Record<string, RoomPlayer>) : {}),
+  )
+}
+
+/** A single player's answer for one question (the player's own answer). */
+export function subscribePlayerAnswer(
+  code: string,
+  qIndex: number,
+  uid: string,
+  cb: (a: PlayerAnswer | null) => void,
+): Unsubscribe {
+  return onValue(ref(db, `rooms/${code}/answers/${qIndex}/${uid}`), (s) =>
+    cb(s.exists() ? (s.val() as PlayerAnswer) : null),
+  )
+}
+
+/** All answers for ONE question (the host needs these to count + score). */
+export function subscribeQuestionAnswers(
+  code: string,
+  qIndex: number,
+  cb: (answers: Record<string, PlayerAnswer>) => void,
+): Unsubscribe {
+  return onValue(ref(db, `rooms/${code}/answers/${qIndex}`), (s) =>
+    cb(s.exists() ? (s.val() as Record<string, PlayerAnswer>) : {}),
   )
 }
 

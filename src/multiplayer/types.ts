@@ -58,10 +58,10 @@ export interface PlayerAnswer {
   awarded?: number // points awarded at reveal
 }
 
-/** A full snapshot of /rooms/{code} as read from RTDB. */
-export interface RoomSnapshot {
-  meta: RoomMeta
-  question?: RoomQuestion | null
-  players?: Record<string, RoomPlayer>
-  answers?: Record<string, Record<string, PlayerAnswer>> // [questionIndex][playerId]
-}
+// The room is stored under /rooms/{code} as:
+//   meta: RoomMeta
+//   question: RoomQuestion           (the current public question)
+//   players: { [playerId]: RoomPlayer }
+//   answers: { [questionIndex]: { [playerId]: PlayerAnswer } }
+// Clients subscribe to these slices individually (see room.ts) rather than the
+// whole room, so a single change never re-downloads everything to everyone.
