@@ -18,6 +18,8 @@ interface MpState {
 
   // ── Player session (set after joining, read by the player screen) ──
   code: string | null
+  /** Our id in the room's players map — a per-TAB id (auth uid + suffix),
+   *  not the raw auth uid, which every tab in a browser shares. */
   uid: string | null
   identity: PlayerIdentity | null // remembered so we can re-assert it on reconnect
   setPlayerSession: (code: string, uid: string, identity: PlayerIdentity) => void

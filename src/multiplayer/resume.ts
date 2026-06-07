@@ -33,8 +33,11 @@ export async function resumePlayerSession(): Promise<void> {
       clearSession() // game already ended
       return
     }
-    await establishPresence(s.code, uid, s.identity)
-    useMpStore.getState().setPlayerSession(s.code, uid, s.identity)
+    // Per-tab player id; legacy sessions (saved before ids were per-tab) fall
+    // back to the auth uid, which is what they joined under.
+    const playerId = s.playerId ?? uid
+    await establishPresence(s.code, playerId, s.identity)
+    useMpStore.getState().setPlayerSession(s.code, playerId, s.identity)
     useGame.getState().setScreen('mpPlayer')
   } catch {
     /* any failure → just leave them on the home screen */

@@ -98,18 +98,23 @@ export async function createRoom(
   throw new Error('Could not allocate a room code — please try again.')
 }
 
-/** Player: join an existing lobby. Returns the player's uid. */
+/** Player: join an existing lobby. Returns the player's id in the room. */
 export async function joinRoom(
   code: string,
   player: { name: string; emoji: string; color: string },
 ): Promise<string> {
   connectDb() // re-open the connection in case a previous session closed it
   const uid = await ensureSignedIn()
+  // Per-TAB player id. The anonymous auth uid is shared by every tab in a
+  // browser, so keying players by the raw uid would make two tabs (e.g. a
+  // family sharing one device, or local testing) overwrite each other. The
+  // uid prefix keeps ids tied to the signed-in user; the suffix splits tabs.
+  const playerId = `${uid}-${Math.random().toString(36).slice(2, 8)}`
   const metaSnap = await get(ref(db, `rooms/${code}/meta`))
   if (!metaSnap.exists()) throw new Error('Room not found — double-check the code.')
   const meta = metaSnap.val() as RoomMeta
   if (meta.status !== 'lobby') throw new Error('That game has already started.')
-  const pRef = ref(db, `rooms/${code}/players/${uid}`)
+  const pRef = ref(db, `rooms/${code}/players/${playerId}`)
   await set(pRef, {
     ...player,
     score: 0,
@@ -120,7 +125,7 @@ export async function joinRoom(
   // them. A blip must never cost a player their name, emoji, or score; the host
   // removes them only if they stay offline past a grace period.
   onDisconnect(pRef).update({ connected: false, disconnectedAt: serverTimestamp() })
-  return uid
+  return playerId
 }
 
 /**
@@ -130,10 +135,10 @@ export async function joinRoom(
  */
 export async function establishPresence(
   code: string,
-  uid: string,
+  playerId: string,
   identity: PlayerIdentity,
 ): Promise<void> {
-  const pRef = ref(db, `rooms/${code}/players/${uid}`)
+  const pRef = ref(db, `rooms/${code}/players/${playerId}`)
   const snap = await get(pRef)
   if (snap.exists()) {
     // Keep their score; restore identity + mark online + clear the offline mark.

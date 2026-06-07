@@ -12,6 +12,9 @@ const HOST_KEY = 'ft.mpHostSession.v1'
 
 export interface SavedSession {
   code: string
+  /** The player's id in the room (per-tab — NOT the shared auth uid, so two
+   *  tabs in one browser stay separate players). Absent in legacy sessions. */
+  playerId?: string
   identity: PlayerIdentity
 }
 
