@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth, signInAnonymously } from 'firebase/auth'
-import { getDatabase } from 'firebase/database'
+import { getDatabase, goOnline, goOffline } from 'firebase/database'
 
 // Public Firebase web config — safe to ship in client code; security is
 // enforced by Auth (anonymous) + Realtime Database rules, not by hiding these.
@@ -27,4 +27,14 @@ export function ensureSignedIn(): Promise<string> {
     signInPromise = signInAnonymously(auth).then((cred) => cred.user.uid)
   }
   return signInPromise
+}
+
+// Open / close the Realtime Database WebSocket explicitly. We close it whenever
+// a user leaves multiplayer (so they stop counting against the concurrent-
+// connection limit even with the tab still open) and reopen it on host/join.
+export function connectDb(): void {
+  goOnline(db)
+}
+export function disconnectDb(): void {
+  goOffline(db)
 }

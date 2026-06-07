@@ -4,6 +4,7 @@ import { useGame } from '../../store/gameStore'
 import { useMpStore } from '../../multiplayer/mpStore'
 import { usePlayerGame } from '../../multiplayer/usePlayerGame'
 import { leaveRoom } from '../../multiplayer/room'
+import { disconnectDb } from '../../lib/firebase'
 import { MANUAL_BONUS_WINDOW } from '../../multiplayer/scoring'
 import { useAudio } from '../../hooks/useAudio'
 import { fireConfetti } from '../ui/ConfettiBurst'
@@ -29,6 +30,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 function NotInGame() {
   const setScreen = useGame((s) => s.setScreen)
   const goHome = () => {
+    disconnectDb()
     useMpStore.getState().reset()
     setScreen('home')
   }
@@ -78,11 +80,14 @@ function ActivePlayer({ code, uid }: ActivePlayerProps) {
 
   const setNotice = useGame((s) => s.setNotice)
 
-  // Leave the room for good (removes you from the lobby) and go home.
+  // Leave the room for good (removes you from the lobby), drop the connection,
+  // and go home.
   const leave = () => {
-    void leaveRoom(code, uid).catch(() => {})
     useMpStore.getState().reset()
     setScreen('home')
+    leaveRoom(code, uid)
+      .catch(() => {})
+      .finally(() => disconnectDb())
   }
 
   // If the host ends/stops the game (the room is deleted), bounce every player
@@ -92,6 +97,7 @@ function ActivePlayer({ code, uid }: ActivePlayerProps) {
     if (status !== 'closed' || closedHandledRef.current) return
     closedHandledRef.current = true
     setNotice('The host ended the game 👋')
+    disconnectDb()
     useMpStore.getState().reset()
     setScreen('home')
   }, [status, setNotice, setScreen])

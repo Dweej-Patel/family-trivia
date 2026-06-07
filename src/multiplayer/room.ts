@@ -9,7 +9,7 @@ import {
   serverTimestamp,
   type Unsubscribe,
 } from 'firebase/database'
-import { db, ensureSignedIn } from '../lib/firebase'
+import { db, ensureSignedIn, connectDb } from '../lib/firebase'
 import type { Pacing, RoomMeta, RoomQuestion, RoomSnapshot } from './types'
 
 // Room-code alphabet with ambiguous characters (O/0, I/1) removed.
@@ -35,6 +35,7 @@ export interface CreateRoomOpts {
 export async function createRoom(
   opts: CreateRoomOpts,
 ): Promise<{ code: string; hostId: string }> {
+  connectDb() // re-open the connection in case a previous session closed it
   const hostId = await ensureSignedIn()
   for (let attempt = 0; attempt < 6; attempt++) {
     const code = generateRoomCode()
@@ -60,6 +61,7 @@ export async function joinRoom(
   code: string,
   player: { name: string; emoji: string; color: string },
 ): Promise<string> {
+  connectDb() // re-open the connection in case a previous session closed it
   const uid = await ensureSignedIn()
   const metaSnap = await get(ref(db, `rooms/${code}/meta`))
   if (!metaSnap.exists()) throw new Error('Room not found — double-check the code.')

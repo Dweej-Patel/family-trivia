@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
 import { useMpStore } from '../../multiplayer/mpStore'
 import { useHostGame } from '../../multiplayer/useHostGame'
+import { disconnectDb } from '../../lib/firebase'
 import { useGame, selectQuestions } from '../../store/gameStore'
 import { useAudio } from '../../hooks/useAudio'
 import { Button } from '../ui/Button'
@@ -102,10 +103,13 @@ export function MpHostScreen() {
     return () => window.clearInterval(id)
   }, [status, pacing, currentIndex, timerSeconds])
 
-  // ── Navigation helpers (always delete the room first) ──────────────────────
+  // ── Navigation helpers (delete the room, then drop the connection) ─────────
   const leaveTo = (screen: 'mode' | 'home' | 'mpHostSetup') => {
     close()
     setScreen(screen)
+    // Closing the socket also fires the onDisconnect that removes the room, so
+    // players are kicked even if the explicit delete above doesn't flush.
+    disconnectDb()
   }
 
   // ── Edge case: no game set up (session lost) ───────────────────────────────
@@ -119,7 +123,7 @@ export function MpHostScreen() {
         <p className="font-body text-lg text-white/70">
           Looks like the game session was lost. Let's set up a new one!
         </p>
-        <Button size="lg" onClick={() => setScreen('mode')}>
+        <Button size="lg" onClick={() => leaveTo('mode')}>
           ← Back to Start
         </Button>
       </div>
