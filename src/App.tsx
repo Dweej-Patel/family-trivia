@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGame } from './store/gameStore'
 import { useMpStore } from './multiplayer/mpStore'
@@ -49,6 +49,58 @@ const pageVariants = {
   initial: { opacity: 0, scale: 0.96, y: 16 },
   animate: { opacity: 1, scale: 1, y: 0 },
   exit: { opacity: 0, scale: 1.02, y: -16 },
+}
+
+/** Polls version.json and offers a one-tap refresh when a newer build is live,
+ *  so users on GitHub Pages aren't stuck on a stale cached bundle. */
+function UpdateBanner() {
+  const [latest, setLatest] = useState<string | null>(null)
+  useEffect(() => {
+    let active = true
+    const check = async () => {
+      try {
+        // Unique query bypasses both the browser and the CDN cache, so we always
+        // see the freshly-deployed version.json.
+        const res = await fetch(`${import.meta.env.BASE_URL}version.json?t=${Date.now()}`, {
+          cache: 'no-store',
+        })
+        if (!res.ok) return
+        const data = (await res.json()) as { id?: string }
+        if (active && data.id && data.id !== __BUILD_ID__) setLatest(data.id)
+      } catch {
+        /* offline or dev (no version.json) — ignore */
+      }
+    }
+    check()
+    const id = window.setInterval(check, 60000)
+    const onVis = () => {
+      if (document.visibilityState === 'visible') check()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      active = false
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [])
+
+  if (!latest) return null
+  const update = () => {
+    // Cache-bust the document URL so the reload fetches the newest index.html.
+    const url = new URL(window.location.href)
+    url.searchParams.set('v', latest)
+    window.location.replace(url.toString())
+  }
+  return (
+    <motion.button
+      onClick={update}
+      initial={{ y: 70, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="fixed bottom-4 left-1/2 z-[60] -translate-x-1/2 rounded-2xl border border-white/25 bg-gradient-to-br from-grape to-bubble px-5 py-3 font-display text-sm font-bold text-white shadow-playful"
+    >
+      ✨ New version available — tap to update
+    </motion.button>
+  )
 }
 
 /** Transient banner for app-wide notices (e.g. "the host ended the game"). */
@@ -103,6 +155,7 @@ export default function App() {
         <AnimatedBackground />
         <MuteButton />
         <NoticeToast />
+        <UpdateBanner />
         <AnimatePresence mode="wait">
           <motion.div
             key={screen}
