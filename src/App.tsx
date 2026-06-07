@@ -156,27 +156,28 @@ export default function App() {
         <MuteButton />
         <NoticeToast />
         <UpdateBanner />
-        <AnimatePresence mode="wait">
+        {/* Each screen mounts fresh (keyed) and springs in. We deliberately do
+            NOT use AnimatePresence exit animations here: a lazy screen exiting
+            while it re-renders (e.g. its room is deleted on the way out) hung the
+            transition on a blank screen. An enter-only animation is bug-free. */}
+        <Suspense
+          fallback={
+            <div className="relative z-10 flex min-h-screen items-center justify-center font-display text-xl font-bold text-white/80">
+              Loading…
+            </div>
+          }
+        >
           <motion.div
             key={screen}
             variants={pageVariants}
             initial="initial"
             animate="animate"
-            exit="exit"
             transition={{ type: 'spring', stiffness: 260, damping: 26 }}
             className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-6 sm:px-6"
           >
-            <Suspense
-              fallback={
-                <div className="flex flex-1 items-center justify-center font-display text-xl font-bold text-white/80">
-                  Loading…
-                </div>
-              }
-            >
-              <Current />
-            </Suspense>
+            <Current />
           </motion.div>
-        </AnimatePresence>
+        </Suspense>
       </div>
     </AudioProvider>
   )
