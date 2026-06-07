@@ -51,6 +51,33 @@ const pageVariants = {
   exit: { opacity: 0, scale: 1.02, y: -16 },
 }
 
+/** Transient banner for app-wide notices (e.g. "the host ended the game"). */
+function NoticeToast() {
+  const notice = useGame((s) => s.notice)
+  const setNotice = useGame((s) => s.setNotice)
+  useEffect(() => {
+    if (!notice) return
+    const t = window.setTimeout(() => setNotice(null), 4500)
+    return () => window.clearTimeout(t)
+  }, [notice, setNotice])
+  return (
+    <AnimatePresence>
+      {notice && (
+        <motion.div
+          key={notice}
+          initial={{ opacity: 0, y: -24 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -24 }}
+          onClick={() => setNotice(null)}
+          className="fixed left-1/2 top-4 z-[60] -translate-x-1/2 cursor-pointer rounded-2xl border border-white/25 bg-ink/90 px-5 py-3 font-display text-base font-bold text-white shadow-playful backdrop-blur-md"
+        >
+          {notice}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
 export default function App() {
   const screen = useGame((s) => s.screen)
   const setScreen = useGame((s) => s.setScreen)
@@ -75,6 +102,7 @@ export default function App() {
       <div className="relative min-h-full w-full overflow-hidden text-white">
         <AnimatedBackground />
         <MuteButton />
+        <NoticeToast />
         <AnimatePresence mode="wait">
           <motion.div
             key={screen}

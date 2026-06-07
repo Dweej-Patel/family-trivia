@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGame } from '../../store/gameStore'
 import { useMpStore } from '../../multiplayer/mpStore'
 import { usePlayerGame } from '../../multiplayer/usePlayerGame'
+import { leaveRoom } from '../../multiplayer/room'
 import { useAudio } from '../../hooks/useAudio'
 import { fireConfetti } from '../ui/ConfettiBurst'
 import { Button } from '../ui/Button'
@@ -74,10 +75,25 @@ function ActivePlayer({ code, uid }: ActivePlayerProps) {
     answer,
   } = game
 
-  const goHome = () => {
+  const setNotice = useGame((s) => s.setNotice)
+
+  // Leave the room for good (removes you from the lobby) and go home.
+  const leave = () => {
+    void leaveRoom(code, uid).catch(() => {})
     useMpStore.getState().reset()
     setScreen('home')
   }
+
+  // If the host ends/stops the game (the room is deleted), bounce every player
+  // back home with a notification — no dead-end "closed" screen to tap through.
+  const closedHandledRef = useRef(false)
+  useEffect(() => {
+    if (status !== 'closed' || closedHandledRef.current) return
+    closedHandledRef.current = true
+    setNotice('The host ended the game 👋')
+    useMpStore.getState().reset()
+    setScreen('home')
+  }, [status, setNotice, setScreen])
 
   // ── One-time guards keyed by question / finish so sounds fire once ──
   const revealSoundFor = useRef<number | null>(null)
@@ -145,15 +161,11 @@ function ActivePlayer({ code, uid }: ActivePlayerProps) {
   }
 
   if (status === 'closed') {
+    // The effect above navigates home with a notice; this is just a brief frame.
     return (
       <Shell>
         <div className="text-6xl">👋</div>
-        <h1 className="font-display text-4xl font-bold">
-          The host ended the game.
-        </h1>
-        <Button onClick={goHome} size="lg">
-          🏠 Home
-        </Button>
+        <h1 className="font-display text-2xl font-bold">Leaving…</h1>
       </Shell>
     )
   }
@@ -229,8 +241,8 @@ function ActivePlayer({ code, uid }: ActivePlayerProps) {
             </div>
           ))}
         </Card>
-        <Button onClick={goHome} size="lg">
-          🏠 Home
+        <Button onClick={leave} size="lg">
+          🚪 Leave
         </Button>
       </Shell>
     )

@@ -82,6 +82,9 @@ export const useGame = create<GameState>((set) => ({
   screen: 'home',
   setScreen: (screen) => set({ screen }),
 
+  notice: null,
+  setNotice: (notice) => set({ notice }),
+
   // ── Players ──
   players: initialPlayers,
   addPlayer: (name, emoji, color) =>

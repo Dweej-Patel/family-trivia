@@ -151,3 +151,8 @@ export function restartRoom(
 export function closeRoom(code: string): Promise<void> {
   return remove(ref(db, `rooms/${code}`))
 }
+
+/** Player: remove yourself from a room (used when leaving after the game). */
+export function leaveRoom(code: string, uid: string): Promise<void> {
+  return remove(ref(db, `rooms/${code}/players/${uid}`))
+}

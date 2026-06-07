@@ -52,6 +52,10 @@ export interface GameState {
   screen: Screen
   setScreen: (s: Screen) => void
 
+  // ── Transient global notice (e.g. "the host ended the game") ──
+  notice: string | null
+  setNotice: (n: string | null) => void
+
   // ── Players ──
   players: Player[]
   addPlayer: (name: string, emoji: string, color: string) => void
