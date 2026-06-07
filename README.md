@@ -1,27 +1,32 @@
 # 🧠 Family Trivia 🎉
 
-A vibrant, animated **family trivia game** for shared-screen / pass-and-play. Add
-your players, write your own questions, and battle it out with big tactile buttons,
-spring animations, sound effects, confetti, and a winner's podium.
+A vibrant, animated **family trivia game** with two ways to play: pass-and-play on
+one shared screen, **or** Kahoot-style multiplayer where everyone joins a room from
+their phone. Big tactile buttons, spring animations, sound effects, confetti, and a
+winner's podium.
+
+**▶ Play it live:** https://dweej-patel.github.io/family-trivia/
 
 ![Home](docs/home.png)
 
 ## ✨ Features
 
-- **Pass-and-play** on one shared screen (laptop, tablet, or TV) — 1–8 players.
-- **Your own questions** — built-in editor to add / edit / delete questions across
-  custom categories, with **JSON import/export** and a curated starter pack.
-- **Multiple-choice & true/false** questions with easy/medium/hard difficulty (harder
-  questions are worth more points).
-- **Playful visuals** — animated gradient background, floating blobs, springy motion,
-  per-player avatars & colors.
-- **Optional countdown timer** with a depleting ring and tension cues.
-- **Full audio** — synthesized sound effects (correct / wrong / tick / whoosh / victory)
-  and gentle background music, with a one-tap **mute** toggle. No audio files needed.
-- **Halftime leaderboard** between turn cycles and a celebratory **podium + confetti**
-  finale.
-- Everything is saved to `localStorage` — your questions and players persist. Works
-  fully offline; no backend, no API keys.
+- **Two modes:**
+  - 🛋️ **One device** — pass-and-play on a shared screen (laptop, tablet, or TV), 1–8 players.
+  - 📱 **Everyone's phones** — the host shows a room code + QR; players join from their
+    phones and answer live, with a host-driven leaderboard and podium.
+- **~970 questions across 13 categories**, all fact-checked and calibrated easy / medium
+  / hard — plus **importable question packs** (e.g. an India Heritage pack) and a built-in
+  pack picker.
+- **Your own questions** — a full editor to add / edit / delete across custom categories,
+  with search, filters, pagination, and **JSON import / export**.
+- **Multiple-choice & true/false**, with a speed bonus for quick correct answers.
+- **Playful visuals** — animated gradient background, springy motion, per-player avatars
+  & colors, confetti.
+- **Full audio** — synthesized sound effects + gentle background music, one-tap **mute**.
+  No audio files needed.
+- **Free & static-hostable.** Single-player works fully offline; multiplayer uses a free
+  Firebase Realtime Database (anonymous, no logins for players).
 
 ## 🚀 Getting started
 
