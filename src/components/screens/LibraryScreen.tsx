@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGame, useCategories } from '../../store/gameStore'
+import { starterQuestions } from '../../data/starterQuestions'
 import type { Difficulty, Question, QuestionType } from '../../types'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
@@ -8,6 +9,17 @@ import { Chip } from '../ui/Chip'
 
 const ALL = '__all__'
 const PAGE_SIZE = 12
+const DEFAULT_PACK = '__default__'
+
+// A ready-made question pack listed in /packs.json and downloadable from /public.
+interface PackInfo {
+  id: string
+  name: string
+  emoji?: string
+  description?: string
+  file: string
+  count?: number
+}
 
 const DIFFICULTIES: { value: Difficulty; label: string; emoji: string }[] = [
   { value: 'easy', label: 'Easy', emoji: '🟢' },
@@ -116,9 +128,80 @@ export function LibraryScreen() {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [toast, setToast] = useState<Toast | null>(null)
 
+  // Available downloadable packs (from /packs.json) + which one is selected.
+  const [packs, setPacks] = useState<PackInfo[]>([])
+  const [selectedPack, setSelectedPack] = useState<string>('')
+  const [packLoading, setPackLoading] = useState(false)
+
   const showToast = (t: Toast) => {
     setToast(t)
     window.setTimeout(() => setToast((cur) => (cur === t ? null : cur)), 3200)
+  }
+
+  // Fetch the manifest of ready-made packs once.
+  useEffect(() => {
+    let active = true
+    fetch(`${import.meta.env.BASE_URL}packs.json`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data: { packs?: PackInfo[] }) => {
+        if (active && Array.isArray(data.packs)) setPacks(data.packs)
+      })
+      .catch(() => {
+        /* no manifest available — picker just shows the default */
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // Load whichever pack is selected (default = built-in starter set).
+  const loadSelectedPack = async () => {
+    if (!selectedPack) return
+    if (selectedPack === DEFAULT_PACK) {
+      const ok = window.confirm(
+        `Load the default starter pack (${starterQuestions.length} questions)?\n\n` +
+          'This REPLACES your current library.',
+      )
+      if (!ok) return
+      resetQuestionsToStarter()
+      showToast({ kind: 'ok', text: 'Loaded the default starter pack.' })
+      setSelectedPack('')
+      return
+    }
+    const pack = packs.find((p) => p.id === selectedPack)
+    if (!pack) return
+    setPackLoading(true)
+    try {
+      const res = await fetch(`${import.meta.env.BASE_URL}${pack.file}`, {
+        cache: 'no-store',
+      })
+      if (!res.ok) throw new Error('fetch failed')
+      const data: unknown = await res.json()
+      if (!Array.isArray(data)) throw new Error('not an array')
+      const valid: Question[] = []
+      for (const item of data) {
+        const q = coerceQuestion(item)
+        if (q) valid.push(q)
+      }
+      if (valid.length === 0) {
+        showToast({ kind: 'error', text: 'That pack had no valid questions.' })
+        return
+      }
+      const replace = window.confirm(
+        `Load "${pack.name}" (${valid.length} questions)?\n\n` +
+          'OK = REPLACE your library · Cancel = ADD to it.',
+      )
+      importQuestions(valid, replace)
+      showToast({
+        kind: 'ok',
+        text: `${replace ? 'Loaded' : 'Added'} ${valid.length} questions from ${pack.name}.`,
+      })
+      setSelectedPack('')
+    } catch {
+      showToast({ kind: 'error', text: 'Could not load that pack.' })
+    } finally {
+      setPackLoading(false)
+    }
   }
 
   const visible = useMemo(() => {
@@ -212,16 +295,6 @@ export function LibraryScreen() {
     }
     reader.onerror = () => showToast({ kind: 'error', text: 'Could not read file.' })
     reader.readAsText(file)
-  }
-
-  // ── Reset ─────────────────────────────────────────────────────────────────
-  const handleReset = () => {
-    const ok = window.confirm(
-      'Reset to the starter pack? This replaces ALL your custom questions.',
-    )
-    if (!ok) return
-    resetQuestionsToStarter()
-    showToast({ kind: 'ok', text: 'Reset to starter pack.' })
   }
 
   // ── Save from editor ──────────────────────────────────────────────────────
@@ -372,6 +445,47 @@ export function LibraryScreen() {
         </div>
       </Card>
 
+      {/* Question pack picker */}
+      <Card className="flex flex-col gap-3">
+        <h2 className="font-display text-xl font-bold text-white">📚 Question packs</h2>
+        <p className="font-body text-sm font-semibold text-white/70">
+          Load a ready-made set — the default questions or a themed pack.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={selectedPack}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+              setSelectedPack(e.target.value)
+            }
+            className="min-w-[15rem] flex-1 rounded-2xl border-2 border-white/25 bg-ink/70 px-4 py-2 font-body text-sm font-semibold text-white outline-none focus-visible:ring-4 focus-visible:ring-white/40"
+          >
+            <option value="">Choose a pack…</option>
+            <option value={DEFAULT_PACK}>
+              ⭐ Default starter pack ({starterQuestions.length})
+            </option>
+            {packs.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.emoji ? `${p.emoji} ` : ''}
+                {p.name}
+                {p.count ? ` (${p.count})` : ''}
+              </option>
+            ))}
+          </select>
+          <Button
+            size="sm"
+            disabled={!selectedPack || packLoading}
+            onClick={loadSelectedPack}
+          >
+            {packLoading ? 'Loading…' : 'Load'}
+          </Button>
+        </div>
+        {selectedPack && selectedPack !== DEFAULT_PACK && (
+          <p className="font-body text-xs text-white/50">
+            {packs.find((p) => p.id === selectedPack)?.description}
+          </p>
+        )}
+      </Card>
+
       {/* Import / Export row */}
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="secondary" size="sm" onClick={handleExport}>
@@ -388,9 +502,6 @@ export function LibraryScreen() {
             className="hidden"
           />
         </label>
-        <Button variant="danger" size="sm" onClick={handleReset}>
-          ♻️ Reset to starter pack
-        </Button>
       </div>
 
       {/* Results count */}
