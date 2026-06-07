@@ -25,7 +25,7 @@ const PACING_OPTIONS: {
 }[] = [
   {
     value: 'timed',
-    label: '⏱️ Timed (Kahoot-style)',
+    label: '⏱️ Timed',
     desc: 'Auto-advances; faster answers score more.',
     color: '#f97316',
   },

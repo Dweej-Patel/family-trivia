@@ -9,7 +9,7 @@ import { fireConfetti } from '../ui/ConfettiBurst'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 
-// Kahoot-style palette for the answer tiles (cycled if there are >4 options).
+// Bright answer-tile palette (cycled if there are >4 options).
 const ANSWER_COLORS = ['#ef4444', '#38bdf8', '#fbbf24', '#34d399', '#7c3aed', '#ec4899']
 const ANSWER_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F']
 

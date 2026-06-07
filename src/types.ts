@@ -9,7 +9,7 @@ export type Screen =
   | 'roundScore'
   | 'results'
   | 'library'
-  // ── Multiplayer (Kahoot-style) ──
+  // ── Multiplayer (host + players on their phones) ──
   | 'mpHostSetup' // host configures the game
   | 'mpHost' // host screen: lobby → questions → results
   | 'mpJoin' // player enters room code + name
