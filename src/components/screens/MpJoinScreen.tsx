@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGame } from '../../store/gameStore'
 import { useMpStore } from '../../multiplayer/mpStore'
 import { joinRoom } from '../../multiplayer/room'
+import { saveSession } from '../../multiplayer/session'
 import { useAudio } from '../../hooks/useAudio'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
@@ -69,6 +70,7 @@ export function MpJoinScreen() {
       const identity = { name: trimmedName, emoji, color }
       const uid = await joinRoom(trimmedCode, identity)
       useMpStore.getState().setPlayerSession(trimmedCode, uid, identity)
+      saveSession({ code: trimmedCode, identity }) // survive a reload
       play('whoosh')
       setScreen('mpPlayer')
     } catch (err) {

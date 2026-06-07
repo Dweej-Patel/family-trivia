@@ -4,6 +4,7 @@ import { useGame } from '../../store/gameStore'
 import { useMpStore } from '../../multiplayer/mpStore'
 import { usePlayerGame } from '../../multiplayer/usePlayerGame'
 import { leaveRoom } from '../../multiplayer/room'
+import { clearSession } from '../../multiplayer/session'
 import type { PlayerIdentity } from '../../multiplayer/types'
 import { disconnectDb } from '../../lib/firebase'
 import { MANUAL_BONUS_WINDOW } from '../../multiplayer/scoring'
@@ -31,6 +32,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 function NotInGame() {
   const setScreen = useGame((s) => s.setScreen)
   const goHome = () => {
+    clearSession()
     disconnectDb()
     useMpStore.getState().reset()
     setScreen('home')
@@ -86,6 +88,7 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
   // Leave the room for good (removes you from the lobby), drop the connection,
   // and go home.
   const leave = () => {
+    clearSession()
     useMpStore.getState().reset()
     setScreen('home')
     leaveRoom(code, uid)
@@ -100,6 +103,7 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
     if (status !== 'closed' || closedHandledRef.current) return
     closedHandledRef.current = true
     setNotice('The host ended the game 👋')
+    clearSession()
     disconnectDb()
     useMpStore.getState().reset()
     setScreen('home')

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGame } from './store/gameStore'
 import { useMpStore } from './multiplayer/mpStore'
+import { loadSession } from './multiplayer/session'
 import { AudioProvider } from './hooks/useAudio'
 import { AnimatedBackground } from './components/ui/AnimatedBackground'
 import { MuteButton } from './components/ui/MuteButton'
@@ -136,7 +137,8 @@ export default function App() {
   const setJoinCodePrefill = useMpStore((s) => s.setJoinCodePrefill)
   const Current = screens[screen]
 
-  // Deep link: scanning the host's QR opens .../?room=CODE — jump straight to join.
+  // On load: handle a QR deep link, or resume a player's saved session after a
+  // reload / iOS tab-discard (so a refresh doesn't kick them out of the game).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const room = params.get('room')
@@ -145,6 +147,12 @@ export default function App() {
       setScreen('mpJoin')
       // Clean the URL so a refresh doesn't keep forcing the join screen.
       window.history.replaceState({}, '', window.location.pathname)
+      return
+    }
+    // No deep link — if this tab has a saved player session, rejoin it. The
+    // Firebase-heavy resume code is loaded only when there's actually a session.
+    if (loadSession()) {
+      void import('./multiplayer/resume').then((m) => m.resumePlayerSession())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
