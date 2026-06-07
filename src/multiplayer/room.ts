@@ -307,7 +307,12 @@ export function closeRoom(code: string): Promise<void> {
   return remove(ref(db, `rooms/${code}`))
 }
 
-/** Player: remove yourself from a room (used when leaving after the game). */
-export function leaveRoom(code: string, uid: string): Promise<void> {
-  return remove(ref(db, `rooms/${code}/players/${uid}`))
+/** Player: remove yourself from a room (leaving the lobby or after the game).
+ *  Disarms the on-disconnect "mark me offline" handler FIRST — otherwise the
+ *  disconnect that follows would re-create the deleted node as a nameless
+ *  ghost ("connected: false" and nothing else). */
+export async function leaveRoom(code: string, uid: string): Promise<void> {
+  const pRef = ref(db, `rooms/${code}/players/${uid}`)
+  await onDisconnect(pRef).cancel()
+  await remove(pRef)
 }

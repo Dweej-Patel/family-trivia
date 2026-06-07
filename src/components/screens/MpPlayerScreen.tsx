@@ -210,6 +210,9 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
             room
           </p>
         </Card>
+        <Button variant="ghost" onClick={leave}>
+          🚪 Leave Room
+        </Button>
       </Shell>
     )
   }

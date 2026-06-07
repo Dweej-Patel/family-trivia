@@ -24,6 +24,7 @@ import {
 } from './room'
 import { scoreAnswer } from './scoring'
 import { useMpStore } from './mpStore'
+import { saveHostSession, clearHostSession } from './session'
 
 export interface HostPlayer extends RoomPlayer {
   id: string
@@ -132,6 +133,18 @@ export function useHostGame(
     return () => unsubs.forEach((u) => u())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Keep the per-tab host session current (room + deck + settings) so a reload
+  // resumes hosting this room — mirroring how a player's session survives.
+  useEffect(() => {
+    if (!code) return
+    saveHostSession({
+      code,
+      deck,
+      pacing: opts.pacing,
+      timerSeconds: opts.timerSeconds,
+    })
+  }, [code, deck, opts.pacing, opts.timerSeconds])
 
   const status: RoomStatus | 'creating' = meta?.status ?? 'creating'
   const currentIndex = meta?.questionIndex ?? -1
@@ -259,6 +272,7 @@ export function useHostGame(
   const close = useCallback(() => {
     if (!code) return
     useMpStore.getState().setHostRoomCode(null)
+    clearHostSession()
     void closeRoom(code)
   }, [code])
 

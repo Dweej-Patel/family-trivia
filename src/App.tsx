@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGame } from './store/gameStore'
 import { useMpStore } from './multiplayer/mpStore'
-import { loadSession } from './multiplayer/session'
+import { loadSession, loadHostSession } from './multiplayer/session'
 import { AudioProvider } from './hooks/useAudio'
 import { AnimatedBackground } from './components/ui/AnimatedBackground'
 import { MuteButton } from './components/ui/MuteButton'
@@ -149,10 +149,13 @@ export default function App() {
       window.history.replaceState({}, '', window.location.pathname)
       return
     }
-    // No deep link — if this tab has a saved player session, rejoin it. The
-    // Firebase-heavy resume code is loaded only when there's actually a session.
+    // No deep link — if this tab has a saved player or host session, rejoin it.
+    // The Firebase-heavy resume code is loaded only when there's actually one.
+    // (A tab is only ever one or the other; player wins if both somehow exist.)
     if (loadSession()) {
       void import('./multiplayer/resume').then((m) => m.resumePlayerSession())
+    } else if (loadHostSession()) {
+      void import('./multiplayer/resume').then((m) => m.resumeHostSession())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
