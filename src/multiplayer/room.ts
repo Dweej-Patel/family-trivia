@@ -56,8 +56,11 @@ export async function createRoom(
       totalQuestions: opts.totalQuestions,
       createdAt: serverTimestamp(),
     })
-    // Auto-clean the whole room if the host closes the tab / disconnects.
-    onDisconnect(ref(db, `rooms/${code}`)).remove()
+    // NOTE: we deliberately do NOT auto-delete the room when the host's
+    // connection drops — a momentary blip must never end everyone's game. The
+    // host's listeners auto-recover on reconnect; the room is removed only when
+    // the host explicitly leaves/ends (closeRoom). The cost is that a host who
+    // hard-closes their tab leaves a tiny orphaned room, which is harmless.
     return { code, hostId }
   }
   throw new Error('Could not allocate a room code — please try again.')
