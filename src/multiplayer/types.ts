@@ -41,6 +41,9 @@ export interface RoomPlayer {
   /** Whether the player's device is currently connected. A momentary drop sets
    *  this false (instead of deleting the player) so nobody loses their seat. */
   connected?: boolean
+  /** Server time the player went offline — used by the host to remove players
+   *  who have been gone past a grace period (vs. a brief blip). */
+  disconnectedAt?: number
 }
 
 /** What a player chose at join time — kept on their own device so we can

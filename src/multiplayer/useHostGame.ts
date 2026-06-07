@@ -15,6 +15,7 @@ import {
   finishGame,
   restartRoom,
   closeRoom,
+  removePlayer,
   subscribeMeta,
   subscribePlayers,
   subscribeQuestion,
@@ -47,6 +48,9 @@ export interface HostGame {
 }
 
 const REVEAL_AUTO_NEXT_MS = 4500
+// Remove a player who has been offline this long (closed tab / really left). A
+// blip reconnects within a second or two, so it comfortably survives this.
+const DISCONNECT_GRACE_MS = 45000
 
 /**
  * Host-authoritative game controller. The host holds the full deck (with the
@@ -214,6 +218,26 @@ export function useHostGame(
 
   const close = useCallback(() => {
     if (code) void closeRoom(code)
+  }, [code])
+
+  // Drop players who have been offline past the grace period (left for good),
+  // while still surviving brief blips. Runs only while we have a room.
+  useEffect(() => {
+    if (!code) return
+    const sweep = () => {
+      const now = Date.now()
+      for (const [uid, p] of Object.entries(playersMapRef.current)) {
+        if (
+          p.connected === false &&
+          typeof p.disconnectedAt === 'number' &&
+          now - p.disconnectedAt > DISCONNECT_GRACE_MS
+        ) {
+          void removePlayer(code, uid)
+        }
+      }
+    }
+    const id = window.setInterval(sweep, 10000)
+    return () => window.clearInterval(id)
   }, [code])
 
   // ── Timed-mode automation ──────────────────────────────────────────────────

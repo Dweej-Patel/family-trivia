@@ -116,9 +116,10 @@ export async function joinRoom(
     joinedAt: serverTimestamp(),
     connected: true,
   })
-  // On a connection drop, just mark them offline — DON'T delete them. A blip
-  // must never cost a player their name, emoji, or score.
-  onDisconnect(pRef).update({ connected: false })
+  // On a connection drop, mark them offline (with a timestamp) — DON'T delete
+  // them. A blip must never cost a player their name, emoji, or score; the host
+  // removes them only if they stay offline past a grace period.
+  onDisconnect(pRef).update({ connected: false, disconnectedAt: serverTimestamp() })
   return uid
 }
 
@@ -135,8 +136,8 @@ export async function establishPresence(
   const pRef = ref(db, `rooms/${code}/players/${uid}`)
   const snap = await get(pRef)
   if (snap.exists()) {
-    // Keep their score; just restore identity fields + mark online.
-    await update(pRef, { ...identity, connected: true })
+    // Keep their score; restore identity + mark online + clear the offline mark.
+    await update(pRef, { ...identity, connected: true, disconnectedAt: null })
   } else {
     // Node was lost — recreate from what the device remembers.
     await set(pRef, {
@@ -146,7 +147,13 @@ export async function establishPresence(
       connected: true,
     })
   }
-  onDisconnect(pRef).update({ connected: false })
+  onDisconnect(pRef).update({ connected: false, disconnectedAt: serverTimestamp() })
+}
+
+/** Host: remove a player from the room (used to drop players who stayed offline
+ *  past the grace period). */
+export function removePlayer(code: string, uid: string): Promise<void> {
+  return remove(ref(db, `rooms/${code}/players/${uid}`))
 }
 
 /** Subscribe to Firebase's own connection state (true once reconnected). */

@@ -263,28 +263,36 @@ export function MpHostScreen() {
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <AnimatePresence>
-                  {players.map((p) => (
-                    <motion.div
-                      key={p.id}
-                      layout
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.5, opacity: 0 }}
-                      transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-                      className="flex flex-col items-center gap-2 rounded-2xl border border-white/15 bg-white/10 p-3"
-                    >
-                      <div
-                        className="flex h-12 w-12 items-center justify-center rounded-full text-2xl shadow-playful-sm"
-                        style={{ backgroundColor: p.color }}
-                        aria-hidden
+                  {players.map((p) => {
+                    const offline = p.connected === false
+                    return (
+                      <motion.div
+                        key={p.id}
+                        layout
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: offline ? 0.45 : 1 }}
+                        exit={{ scale: 0.5, opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+                        className="flex flex-col items-center gap-2 rounded-2xl border border-white/15 bg-white/10 p-3"
                       >
-                        {p.emoji}
-                      </div>
-                      <span className="max-w-full truncate font-display text-sm font-bold text-white">
-                        {p.name}
-                      </span>
-                    </motion.div>
-                  ))}
+                        <div
+                          className="flex h-12 w-12 items-center justify-center rounded-full text-2xl shadow-playful-sm"
+                          style={{ backgroundColor: p.color }}
+                          aria-hidden
+                        >
+                          {p.emoji}
+                        </div>
+                        <span className="max-w-full truncate font-display text-sm font-bold text-white">
+                          {p.name}
+                        </span>
+                        {offline && (
+                          <span className="font-body text-[0.65rem] font-bold uppercase tracking-wide text-white/60">
+                            ⚠ reconnecting…
+                          </span>
+                        )}
+                      </motion.div>
+                    )
+                  })}
                 </AnimatePresence>
               </div>
             )}
