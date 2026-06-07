@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Question } from '../types'
-import type { Pacing } from './types'
+import type { Pacing, PlayerIdentity } from './types'
 
 // Lightweight session state for the multiplayer flow (not persisted).
 interface MpState {
@@ -13,7 +13,8 @@ interface MpState {
   // ── Player session (set after joining, read by the player screen) ──
   code: string | null
   uid: string | null
-  setPlayerSession: (code: string, uid: string) => void
+  identity: PlayerIdentity | null // remembered so we can re-assert it on reconnect
+  setPlayerSession: (code: string, uid: string, identity: PlayerIdentity) => void
 
   // Prefill for the join screen (e.g. from a ?room=CODE deep link / QR scan).
   joinCodePrefill: string
@@ -31,10 +32,11 @@ export const useMpStore = create<MpState>((set) => ({
 
   code: null,
   uid: null,
-  setPlayerSession: (code, uid) => set({ code, uid }),
+  identity: null,
+  setPlayerSession: (code, uid, identity) => set({ code, uid, identity }),
 
   joinCodePrefill: '',
   setJoinCodePrefill: (joinCodePrefill) => set({ joinCodePrefill }),
 
-  reset: () => set({ hostDeck: [], code: null, uid: null }),
+  reset: () => set({ hostDeck: [], code: null, uid: null, identity: null }),
 }))

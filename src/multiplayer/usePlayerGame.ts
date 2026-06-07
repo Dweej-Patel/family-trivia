@@ -1,13 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   PlayerAnswer,
   Pacing,
+  PlayerIdentity,
   RoomPlayer,
   RoomQuestion,
   RoomSnapshot,
   RoomStatus,
 } from './types'
-import { subscribeRoom, submitAnswer } from './room'
+import {
+  subscribeRoom,
+  submitAnswer,
+  establishPresence,
+  onConnectionChange,
+} from './room'
 
 export interface PlayerEntry extends RoomPlayer {
   id: string
@@ -27,8 +33,13 @@ export interface PlayerGame {
   answer: (optionIndex: number) => void
 }
 
-/** Player-side view of a room: subscribe to state, submit answers. */
-export function usePlayerGame(code: string, uid: string): PlayerGame {
+/** Player-side view of a room: subscribe to state, submit answers, and keep the
+ *  player's presence alive across momentary network drops. */
+export function usePlayerGame(
+  code: string,
+  uid: string,
+  identity?: PlayerIdentity | null,
+): PlayerGame {
   const [snapshot, setSnapshot] = useState<RoomSnapshot | null>(null)
   const [closed, setClosed] = useState(false)
 
@@ -39,6 +50,20 @@ export function usePlayerGame(code: string, uid: string): PlayerGame {
     })
     return () => unsub()
   }, [code])
+
+  // Robustness: whenever Firebase (re)connects, re-assert our presence — mark
+  // ourselves online, restore identity if the node was lost, and re-arm the
+  // offline-on-disconnect flag. This survives blips without losing name/score.
+  const identityRef = useRef(identity)
+  identityRef.current = identity
+  useEffect(() => {
+    const unsub = onConnectionChange((connected) => {
+      if (connected && identityRef.current) {
+        void establishPresence(code, uid, identityRef.current)
+      }
+    })
+    return () => unsub()
+  }, [code, uid])
 
   const meta = snapshot?.meta
   const status: RoomStatus | 'connecting' | 'closed' = closed

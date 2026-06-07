@@ -66,12 +66,9 @@ export function MpJoinScreen() {
     setSubmitting(true)
     setError(null)
     try {
-      const uid = await joinRoom(trimmedCode, {
-        name: trimmedName,
-        emoji,
-        color,
-      })
-      useMpStore.getState().setPlayerSession(trimmedCode, uid)
+      const identity = { name: trimmedName, emoji, color }
+      const uid = await joinRoom(trimmedCode, identity)
+      useMpStore.getState().setPlayerSession(trimmedCode, uid, identity)
       play('whoosh')
       setScreen('mpPlayer')
     } catch (err) {

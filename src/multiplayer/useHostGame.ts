@@ -134,6 +134,9 @@ export function useHostGame(
     const newScores: Record<string, number> = {}
     const results: Record<string, { correct: boolean; awarded: number }> = {}
     for (const [uid, ans] of Object.entries(answers)) {
+      // Only score players still present — never resurrect a deleted player as
+      // a nameless "ghost" by writing a score for an unknown id.
+      if (!playersMap[uid]) continue
       const correct = ans.optionIndex === q.correctIndex
       const awarded = scoreAnswer({
         correct,

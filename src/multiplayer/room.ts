@@ -10,7 +10,13 @@ import {
   type Unsubscribe,
 } from 'firebase/database'
 import { db, ensureSignedIn, connectDb } from '../lib/firebase'
-import type { Pacing, RoomMeta, RoomQuestion, RoomSnapshot } from './types'
+import type {
+  Pacing,
+  PlayerIdentity,
+  RoomMeta,
+  RoomQuestion,
+  RoomSnapshot,
+} from './types'
 
 // Room-code alphabet with ambiguous characters (O/0, I/1) removed.
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -68,9 +74,48 @@ export async function joinRoom(
   const meta = metaSnap.val() as RoomMeta
   if (meta.status !== 'lobby') throw new Error('That game has already started.')
   const pRef = ref(db, `rooms/${code}/players/${uid}`)
-  await set(pRef, { ...player, score: 0, joinedAt: serverTimestamp() })
-  onDisconnect(pRef).remove() // drop the player if they close their phone
+  await set(pRef, {
+    ...player,
+    score: 0,
+    joinedAt: serverTimestamp(),
+    connected: true,
+  })
+  // On a connection drop, just mark them offline — DON'T delete them. A blip
+  // must never cost a player their name, emoji, or score.
+  onDisconnect(pRef).update({ connected: false })
   return uid
+}
+
+/**
+ * Re-assert a player's presence: mark them connected, restore their identity if
+ * the node somehow went missing, and (re-)arm the on-disconnect flag. Called on
+ * every (re)connection so the player survives momentary network drops.
+ */
+export async function establishPresence(
+  code: string,
+  uid: string,
+  identity: PlayerIdentity,
+): Promise<void> {
+  const pRef = ref(db, `rooms/${code}/players/${uid}`)
+  const snap = await get(pRef)
+  if (snap.exists()) {
+    // Keep their score; just restore identity fields + mark online.
+    await update(pRef, { ...identity, connected: true })
+  } else {
+    // Node was lost — recreate from what the device remembers.
+    await set(pRef, {
+      ...identity,
+      score: 0,
+      joinedAt: serverTimestamp(),
+      connected: true,
+    })
+  }
+  onDisconnect(pRef).update({ connected: false })
+}
+
+/** Subscribe to Firebase's own connection state (true once reconnected). */
+export function onConnectionChange(cb: (connected: boolean) => void): Unsubscribe {
+  return onValue(ref(db, '.info/connected'), (s) => cb(s.val() === true))
 }
 
 export function subscribeRoom(

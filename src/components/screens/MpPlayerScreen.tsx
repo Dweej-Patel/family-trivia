@@ -4,6 +4,7 @@ import { useGame } from '../../store/gameStore'
 import { useMpStore } from '../../multiplayer/mpStore'
 import { usePlayerGame } from '../../multiplayer/usePlayerGame'
 import { leaveRoom } from '../../multiplayer/room'
+import type { PlayerIdentity } from '../../multiplayer/types'
 import { disconnectDb } from '../../lib/firebase'
 import { MANUAL_BONUS_WINDOW } from '../../multiplayer/scoring'
 import { useAudio } from '../../hooks/useAudio'
@@ -51,20 +52,22 @@ function NotInGame() {
 export function MpPlayerScreen() {
   const code = useMpStore((s) => s.code)
   const uid = useMpStore((s) => s.uid)
+  const identity = useMpStore((s) => s.identity)
 
   if (!code || !uid) return <NotInGame />
-  return <ActivePlayer code={code} uid={uid} />
+  return <ActivePlayer code={code} uid={uid} identity={identity} />
 }
 
 interface ActivePlayerProps {
   code: string
   uid: string
+  identity: PlayerIdentity | null
 }
 
-function ActivePlayer({ code, uid }: ActivePlayerProps) {
+function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
   const setScreen = useGame((s) => s.setScreen)
   const { play } = useAudio()
-  const game = usePlayerGame(code, uid)
+  const game = usePlayerGame(code, uid, identity)
   const {
     status,
     pacing,

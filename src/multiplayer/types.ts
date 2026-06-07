@@ -38,6 +38,17 @@ export interface RoomPlayer {
   color: string
   score: number
   joinedAt: number
+  /** Whether the player's device is currently connected. A momentary drop sets
+   *  this false (instead of deleting the player) so nobody loses their seat. */
+  connected?: boolean
+}
+
+/** What a player chose at join time — kept on their own device so we can
+ *  re-assert it if the connection drops and comes back. */
+export interface PlayerIdentity {
+  name: string
+  emoji: string
+  color: string
 }
 
 export interface PlayerAnswer {
