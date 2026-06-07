@@ -29,7 +29,7 @@ export function generateRoomCode(len = 4): string {
   return s
 }
 
-function roomExists(code: string): Promise<boolean> {
+export function roomExists(code: string): Promise<boolean> {
   return get(ref(db, `rooms/${code}/meta`)).then((s) => s.exists())
 }
 
@@ -266,17 +266,35 @@ export function finishGame(code: string): Promise<void> {
   return update(ref(db, `rooms/${code}/meta`), { status: 'finished' })
 }
 
+export interface RoomSettings {
+  pacing: Pacing
+  timerSeconds: number
+  totalQuestions: number
+}
+
+/** Host: apply edited game settings to a room that's back in the lobby. */
+export function updateRoomSettings(code: string, s: RoomSettings): Promise<void> {
+  return update(ref(db, `rooms/${code}/meta`), {
+    pacing: s.pacing,
+    timerSeconds: s.timerSeconds,
+    totalQuestions: s.totalQuestions,
+  })
+}
+
 /** Host: replay in the SAME room — keep the players, zero their scores, clear
- *  the question/answers, and drop back to the lobby for a fresh game. */
+ *  the question/answers, and drop back to the lobby for a fresh game (applying
+ *  the latest settings, in case the host edited them). */
 export function restartRoom(
   code: string,
   playerIds: string[],
-  totalQuestions: number,
+  settings: RoomSettings,
 ): Promise<void> {
   const updates: Record<string, unknown> = {
     'meta/status': 'lobby',
     'meta/questionIndex': -1,
-    'meta/totalQuestions': totalQuestions,
+    'meta/totalQuestions': settings.totalQuestions,
+    'meta/pacing': settings.pacing,
+    'meta/timerSeconds': settings.timerSeconds,
     question: null, // RTDB removes null keys
     answers: null,
   }

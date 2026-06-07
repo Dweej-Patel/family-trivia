@@ -10,6 +10,7 @@ import type {
 } from './types'
 import {
   createRoom,
+  roomExists,
   pushQuestion,
   revealQuestion,
   finishGame,
@@ -22,6 +23,7 @@ import {
   subscribeQuestionAnswers,
 } from './room'
 import { scoreAnswer } from './scoring'
+import { useMpStore } from './mpStore'
 
 export interface HostPlayer extends RoomPlayer {
   id: string
@@ -43,7 +45,8 @@ export interface HostGame {
   next: () => void
   end: () => void
   /** Replay in the same room: keep players, reset scores, back to lobby.
-   *  Pass the new deck length (the caller swaps in a fresh deck). */
+   *  Pass the new deck length (the caller swaps in a fresh deck); the latest
+   *  pacing/timer settings are re-applied to the room at the same time. */
   restart: (newTotalQuestions: number) => void
   close: () => void
 }
@@ -94,26 +97,38 @@ export function useHostGame(
   }>({ qi: -1, answers: {} })
   curAnswersRef.current = curAnswers
 
-  // Create the room once, then subscribe to its slices.
+  // Attach to the room once, then subscribe to its slices. If this device is
+  // already hosting a room (e.g. the host went back to edit settings and
+  // returned), re-attach to THAT room so the players stay in their lobby;
+  // otherwise create a fresh one.
   const createdRef = useRef(false)
   useEffect(() => {
     if (createdRef.current) return
     createdRef.current = true
     const unsubs: Array<() => void> = []
-    createRoom({
-      pacing: opts.pacing,
-      timerSeconds: opts.timerSeconds,
-      totalQuestions: deck.length,
-    })
-      .then(({ code }) => {
-        setCode(code)
-        unsubs.push(subscribeMeta(code, setMeta))
-        unsubs.push(subscribePlayers(code, setPlayersMap))
-        unsubs.push(subscribeQuestion(code, setQuestion))
+    const subscribe = (code: string) => {
+      setCode(code)
+      unsubs.push(subscribeMeta(code, setMeta))
+      unsubs.push(subscribePlayers(code, setPlayersMap))
+      unsubs.push(subscribeQuestion(code, setQuestion))
+    }
+    const attach = async () => {
+      const existing = useMpStore.getState().hostRoomCode
+      if (existing && (await roomExists(existing).catch(() => false))) {
+        subscribe(existing)
+        return
+      }
+      const { code } = await createRoom({
+        pacing: optsRef.current.pacing,
+        timerSeconds: optsRef.current.timerSeconds,
+        totalQuestions: deckRef.current.length,
       })
-      .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : 'Could not create the room.'),
-      )
+      useMpStore.getState().setHostRoomCode(code)
+      subscribe(code)
+    }
+    attach().catch((e: unknown) =>
+      setError(e instanceof Error ? e.message : 'Could not create the room.'),
+    )
     return () => unsubs.forEach((u) => u())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -228,13 +243,23 @@ export function useHostGame(
       revealedForRef.current = -1
       advancedFromRef.current = -1
       const ids = Object.keys(playersMapRef.current)
-      void restartRoom(code, ids, newTotalQuestions)
+      // Read straight from the store: the caller swaps in the new session right
+      // before calling restart, and (unlike props/refs) the store is already
+      // up to date within the same event handler.
+      const { hostPacing, hostTimerSeconds } = useMpStore.getState()
+      void restartRoom(code, ids, {
+        totalQuestions: newTotalQuestions,
+        pacing: hostPacing,
+        timerSeconds: hostTimerSeconds,
+      })
     },
     [code],
   )
 
   const close = useCallback(() => {
-    if (code) void closeRoom(code)
+    if (!code) return
+    useMpStore.getState().setHostRoomCode(null)
+    void closeRoom(code)
   }, [code])
 
   // Drop players who have been offline past the grace period (left for good),

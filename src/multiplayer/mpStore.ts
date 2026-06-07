@@ -10,6 +10,12 @@ interface MpState {
   hostTimerSeconds: number
   setHostSession: (deck: Question[], pacing: Pacing, timerSeconds: number) => void
 
+  /** The live room this device is hosting. Lets the host navigate away from the
+   *  host screen (e.g. back to setup to edit settings) and re-attach to the SAME
+   *  room instead of creating a new one. */
+  hostRoomCode: string | null
+  setHostRoomCode: (code: string | null) => void
+
   // ── Player session (set after joining, read by the player screen) ──
   code: string | null
   uid: string | null
@@ -30,6 +36,9 @@ export const useMpStore = create<MpState>((set) => ({
   setHostSession: (hostDeck, hostPacing, hostTimerSeconds) =>
     set({ hostDeck, hostPacing, hostTimerSeconds }),
 
+  hostRoomCode: null,
+  setHostRoomCode: (hostRoomCode) => set({ hostRoomCode }),
+
   code: null,
   uid: null,
   identity: null,
@@ -38,5 +47,6 @@ export const useMpStore = create<MpState>((set) => ({
   joinCodePrefill: '',
   setJoinCodePrefill: (joinCodePrefill) => set({ joinCodePrefill }),
 
-  reset: () => set({ hostDeck: [], code: null, uid: null, identity: null }),
+  reset: () =>
+    set({ hostDeck: [], hostRoomCode: null, code: null, uid: null, identity: null }),
 }))

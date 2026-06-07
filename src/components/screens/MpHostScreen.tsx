@@ -52,9 +52,11 @@ export function MpHostScreen() {
   } = game
 
   // Replay in the SAME room with fresh questions — keeps everyone connected.
+  // Uses the CURRENT config (not the session's original pacing/timer) so any
+  // settings the host edited along the way carry into the next game.
   const playAgain = () => {
     const newDeck = selectQuestions(questions, config)
-    useMpStore.getState().setHostSession(newDeck, pacing, timerSeconds)
+    useMpStore.getState().setHostSession(newDeck, config.pacing, config.timerSeconds)
     restart(newDeck.length)
   }
 
@@ -129,7 +131,7 @@ export function MpHostScreen() {
   }
 
   // ── Navigation helpers (delete the room, then drop the connection) ─────────
-  const leaveTo = (screen: 'mode' | 'home' | 'mpHostSetup') => {
+  const leaveTo = (screen: 'mode' | 'home') => {
     close()
     setScreen(screen)
     // Closing the socket also fires the onDisconnect that removes the room, so
@@ -300,17 +302,28 @@ export function MpHostScreen() {
           </div>
         </div>
 
-        <div className="mt-auto flex flex-col items-center gap-3 pt-2 sm:flex-row sm:justify-center">
-          <Button
-            size="lg"
-            disabled={players.length < 1}
-            onClick={start}
-          >
-            Start Game ▶
-          </Button>
-          <Button size="lg" variant="ghost" onClick={() => leaveTo('mode')}>
-            Cancel
-          </Button>
+        <div className="mt-auto flex flex-col items-center gap-3 pt-2">
+          <p className="font-body text-sm font-semibold text-white/60">
+            🎯 {totalQuestions} questions ·{' '}
+            {pacing === 'timed' ? `⏱️ Timed · ${timerSeconds}s` : '✋ Host controls'}
+          </p>
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Button
+              size="lg"
+              disabled={players.length < 1}
+              onClick={start}
+            >
+              Start Game ▶
+            </Button>
+            {/* Plain navigation — the room stays alive, and the setup screen
+                saves changes back into it. */}
+            <Button size="lg" variant="ghost" onClick={() => setScreen('mpHostSetup')}>
+              ⚙️ Edit Settings
+            </Button>
+            <Button size="lg" variant="ghost" onClick={() => leaveTo('mode')}>
+              Cancel
+            </Button>
+          </div>
         </div>
       </div>
     )

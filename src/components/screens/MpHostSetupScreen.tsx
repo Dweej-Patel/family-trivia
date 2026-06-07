@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { useGame, useCategories, selectQuestions } from '../../store/gameStore'
 import { useMpStore } from '../../multiplayer/mpStore'
+import { updateRoomSettings } from '../../multiplayer/room'
 import { useAudio } from '../../hooks/useAudio'
 import type { Difficulty } from '../../types'
 import type { Pacing } from '../../multiplayer/types'
@@ -53,6 +54,9 @@ export function MpHostSetupScreen() {
   const questions = useGame((s) => s.questions)
   const categories = useCategories()
   const { play } = useAudio()
+  // When a room is already live (the host came back from the lobby to tweak
+  // settings), this screen EDITS that room instead of creating a new one.
+  const editingCode = useMpStore((s) => s.hostRoomCode)
 
   const toggleCategory = (cat: string) => {
     const has = config.categories.includes(cat)
@@ -74,6 +78,15 @@ export function MpHostSetupScreen() {
     play('whoosh')
     const deck = selectQuestions(questions, config)
     useMpStore.getState().setHostSession(deck, config.pacing, config.timerSeconds)
+    // Editing a live room: push the new settings to its meta so players (and the
+    // re-attaching host screen) see them. Creation is handled by the host screen.
+    if (editingCode) {
+      void updateRoomSettings(editingCode, {
+        pacing: config.pacing,
+        timerSeconds: config.timerSeconds,
+        totalQuestions: deck.length,
+      })
+    }
     setScreen('mpHost')
   }
 
@@ -85,7 +98,7 @@ export function MpHostSetupScreen() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 22 }}
       >
-        Host a Game 📡
+        {editingCode ? 'Game Settings ⚙️' : 'Host a Game 📡'}
       </motion.h1>
 
       <motion.div custom={0} variants={sectionVariants} initial="hidden" animate="show">
@@ -214,11 +227,14 @@ export function MpHostSetupScreen() {
       )}
 
       <div className="flex items-center justify-between gap-4 pt-2">
-        <Button variant="ghost" onClick={() => setScreen('mode')}>
+        <Button
+          variant="ghost"
+          onClick={() => setScreen(editingCode ? 'mpHost' : 'mode')}
+        >
           ← Back
         </Button>
         <Button size="lg" onClick={handleCreate}>
-          Create Room 🚀
+          {editingCode ? 'Save Settings 💾' : 'Create Room 🚀'}
         </Button>
       </div>
     </div>
