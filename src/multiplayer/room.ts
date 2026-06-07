@@ -130,6 +130,24 @@ export function finishGame(code: string): Promise<void> {
   return update(ref(db, `rooms/${code}/meta`), { status: 'finished' })
 }
 
+/** Host: replay in the SAME room — keep the players, zero their scores, clear
+ *  the question/answers, and drop back to the lobby for a fresh game. */
+export function restartRoom(
+  code: string,
+  playerIds: string[],
+  totalQuestions: number,
+): Promise<void> {
+  const updates: Record<string, unknown> = {
+    'meta/status': 'lobby',
+    'meta/questionIndex': -1,
+    'meta/totalQuestions': totalQuestions,
+    question: null, // RTDB removes null keys
+    answers: null,
+  }
+  for (const id of playerIds) updates[`players/${id}/score`] = 0
+  return update(ref(db, `rooms/${code}`), updates)
+}
+
 export function closeRoom(code: string): Promise<void> {
   return remove(ref(db, `rooms/${code}`))
 }

@@ -96,7 +96,13 @@ function ActivePlayer({ code, uid }: ActivePlayerProps) {
   }, [status, question, myAnswer, play])
 
   useEffect(() => {
-    if (status !== 'finished' || finishFired.current) return
+    // Reset the guard when a new game starts (host hit "Play Again") so the
+    // celebration can fire again next time we finish.
+    if (status !== 'finished') {
+      finishFired.current = false
+      return
+    }
+    if (finishFired.current) return
     finishFired.current = true
     if (myRank === 1) {
       fireConfetti()

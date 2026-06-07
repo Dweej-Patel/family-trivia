@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
 import { useMpStore } from '../../multiplayer/mpStore'
 import { useHostGame } from '../../multiplayer/useHostGame'
-import { useGame } from '../../store/gameStore'
+import { useGame, selectQuestions } from '../../store/gameStore'
 import { useAudio } from '../../hooks/useAudio'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
@@ -27,6 +27,8 @@ export function MpHostScreen() {
   const pacing = useMpStore((s) => s.hostPacing)
   const timerSeconds = useMpStore((s) => s.hostTimerSeconds)
   const setScreen = useGame((s) => s.setScreen)
+  const questions = useGame((s) => s.questions)
+  const config = useGame((s) => s.config)
   const { play } = useAudio()
 
   const game = useHostGame(deck, { pacing, timerSeconds })
@@ -43,8 +45,16 @@ export function MpHostScreen() {
     start,
     reveal,
     next,
+    restart,
     close,
   } = game
+
+  // Replay in the SAME room with fresh questions — keeps everyone connected.
+  const playAgain = () => {
+    const newDeck = selectQuestions(questions, config)
+    useMpStore.getState().setHostSession(newDeck, pacing, timerSeconds)
+    restart(newDeck.length)
+  }
 
   // ── Per-status one-time effects (guarded by refs) ──────────────────────────
 
@@ -429,7 +439,7 @@ export function MpHostScreen() {
         </div>
 
         <div className="mt-auto flex flex-col items-center gap-3 pt-2 sm:flex-row sm:justify-center">
-          <Button size="lg" onClick={() => leaveTo('mpHostSetup')}>
+          <Button size="lg" onClick={playAgain}>
             🔁 Play Again
           </Button>
           <Button size="lg" variant="ghost" onClick={() => leaveTo('home')}>

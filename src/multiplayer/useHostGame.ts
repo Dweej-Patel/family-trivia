@@ -6,6 +6,7 @@ import {
   pushQuestion,
   revealQuestion,
   finishGame,
+  restartRoom,
   closeRoom,
   subscribeRoom,
 } from './room'
@@ -29,6 +30,9 @@ export interface HostGame {
   reveal: () => void
   next: () => void
   end: () => void
+  /** Replay in the same room: keep players, reset scores, back to lobby.
+   *  Pass the new deck length (the caller swaps in a fresh deck). */
+  restart: (newTotalQuestions: number) => void
   close: () => void
 }
 
@@ -158,6 +162,17 @@ export function useHostGame(
     if (code) void finishGame(code)
   }, [code])
 
+  const restart = useCallback(
+    (newTotalQuestions: number) => {
+      if (!code) return
+      revealedForRef.current = -1
+      advancedFromRef.current = -1
+      const ids = Object.keys(snapshot?.players ?? {})
+      void restartRoom(code, ids, newTotalQuestions)
+    },
+    [code, snapshot],
+  )
+
   const close = useCallback(() => {
     if (code) void closeRoom(code)
   }, [code])
@@ -203,6 +218,7 @@ export function useHostGame(
     reveal,
     next,
     end,
+    restart,
     close,
   }
 }
