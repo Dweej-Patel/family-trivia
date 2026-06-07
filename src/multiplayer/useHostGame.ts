@@ -36,6 +36,7 @@ export interface HostGame {
   totalQuestions: number
   players: HostPlayer[] // sorted by score desc
   answeredCount: number
+  connectedCount: number // players currently online
   isLast: boolean
   start: () => void
   reveal: () => void
@@ -67,7 +68,13 @@ export function useHostGame(
   const [meta, setMeta] = useState<RoomMeta | null>(null)
   const [playersMap, setPlayersMap] = useState<Record<string, RoomPlayer>>({})
   const [question, setQuestion] = useState<RoomQuestion | null>(null)
-  const [curAnswers, setCurAnswers] = useState<Record<string, PlayerAnswer>>({})
+  // Answers are tagged with the question index they belong to, so a lagging
+  // subscription from the previous question can never be mistaken for the
+  // current one (which would auto-reveal the new question instantly).
+  const [curAnswers, setCurAnswers] = useState<{
+    qi: number
+    answers: Record<string, PlayerAnswer>
+  }>({ qi: -1, answers: {} })
 
   const deckRef = useRef(deck)
   deckRef.current = deck
@@ -81,7 +88,10 @@ export function useHostGame(
   playersMapRef.current = playersMap
   const questionRef = useRef<RoomQuestion | null>(null)
   questionRef.current = question
-  const curAnswersRef = useRef<Record<string, PlayerAnswer>>({})
+  const curAnswersRef = useRef<{
+    qi: number
+    answers: Record<string, PlayerAnswer>
+  }>({ qi: -1, answers: {} })
   curAnswersRef.current = curAnswers
 
   // Create the room once, then subscribe to its slices.
@@ -117,10 +127,13 @@ export function useHostGame(
   // Only the current question's answers (re-subscribes as the question advances).
   useEffect(() => {
     if (!code || currentIndex < 0) {
-      setCurAnswers({})
+      setCurAnswers({ qi: currentIndex, answers: {} })
       return
     }
-    return subscribeQuestionAnswers(code, currentIndex, setCurAnswers)
+    const qi = currentIndex
+    return subscribeQuestionAnswers(code, qi, (answers) =>
+      setCurAnswers({ qi, answers }),
+    )
   }, [code, currentIndex])
 
   const players = useMemo<HostPlayer[]>(
@@ -131,7 +144,9 @@ export function useHostGame(
     [playersMap],
   )
 
-  const answeredCount = currentIndex < 0 ? 0 : Object.keys(curAnswers).length
+  const answeredCount =
+    curAnswers.qi === currentIndex ? Object.keys(curAnswers.answers).length : 0
+  const connectedCount = players.filter((p) => p.connected !== false).length
 
   const pushIndex = useCallback(
     (index: number) => {
@@ -166,7 +181,9 @@ export function useHostGame(
     revealedForRef.current = idx
     const q = deckRef.current[idx]
     if (!q) return
-    const answers = curAnswersRef.current
+    // Only use answers that belong to THIS question (never a stale prior set).
+    const answers =
+      curAnswersRef.current.qi === idx ? curAnswersRef.current.answers : {}
     const playerMap = playersMapRef.current
     const startedAt = questionRef.current?.startedAt ?? 0
     const newScores: Record<string, number> = {}
@@ -250,7 +267,11 @@ export function useHostGame(
       const activeCount = Object.values(playersMap).filter(
         (p) => p.connected !== false,
       ).length
-      const numAnswers = Object.keys(curAnswers).length
+      // Only count answers that belong to the CURRENT question.
+      const numAnswers =
+        curAnswers.qi === meta.questionIndex
+          ? Object.keys(curAnswers.answers).length
+          : 0
       if (activeCount > 0 && numAnswers >= activeCount) {
         reveal()
         return
@@ -277,6 +298,7 @@ export function useHostGame(
     totalQuestions,
     players,
     answeredCount,
+    connectedCount,
     isLast,
     start,
     reveal,

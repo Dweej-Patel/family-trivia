@@ -50,7 +50,12 @@ export function usePlayerGame(
   const [meta, setMeta] = useState<RoomMeta | null>(null)
   const [question, setQuestion] = useState<RoomQuestion | null>(null)
   const [playersMap, setPlayersMap] = useState<Record<string, RoomPlayer>>({})
-  const [myAnswer, setMyAnswer] = useState<PlayerAnswer | undefined>(undefined)
+  // Tagged with the question index so a lagging answer from the previous
+  // question never shows as "locked" on the new one.
+  const [myAnswerState, setMyAnswerState] = useState<{
+    qi: number
+    a: PlayerAnswer | undefined
+  }>({ qi: -1, a: undefined })
   const [closed, setClosed] = useState(false)
   const hadMeta = useRef(false)
 
@@ -72,13 +77,18 @@ export function usePlayerGame(
   // Only our own answer for the current question.
   useEffect(() => {
     if (questionIndex < 0) {
-      setMyAnswer(undefined)
+      setMyAnswerState({ qi: questionIndex, a: undefined })
       return
     }
-    return subscribePlayerAnswer(code, questionIndex, uid, (a) =>
-      setMyAnswer(a ?? undefined),
+    const qi = questionIndex
+    return subscribePlayerAnswer(code, qi, uid, (a) =>
+      setMyAnswerState({ qi, a: a ?? undefined }),
     )
   }, [code, uid, questionIndex])
+
+  // Ignore an answer that belongs to a different (previous) question.
+  const myAnswer =
+    myAnswerState.qi === questionIndex ? myAnswerState.a : undefined
 
   // Robustness: re-assert presence whenever Firebase (re)connects — restores
   // our identity if the node was lost and re-arms the offline flag.

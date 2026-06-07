@@ -42,6 +42,7 @@ export function MpHostScreen() {
     totalQuestions,
     players,
     answeredCount,
+    connectedCount,
     isLast,
     start,
     reveal,
@@ -424,10 +425,15 @@ export function MpHostScreen() {
 
         {/* Question phase: answered count + reveal control */}
         {!isReveal && (
-          <div className="mt-auto flex flex-col items-center gap-4 pt-2">
+          <div className="mt-auto flex flex-col items-center gap-3 pt-2">
             <span className="font-display text-2xl font-bold text-white/80 tabular-nums">
-              {answeredCount} / {players.length} answered
+              {answeredCount} / {connectedCount} answered
             </span>
+            {players.length - connectedCount > 0 && (
+              <span className="font-body text-sm font-bold text-sunny">
+                ⚠ {players.length - connectedCount} reconnecting…
+              </span>
+            )}
             {pacing === 'manual' && (
               <Button size="lg" onClick={reveal}>
                 Reveal Answer 👀
