@@ -204,11 +204,51 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
         <p className="font-body text-lg text-white/70">
           Waiting for the host to start…
         </p>
-        <Card className="w-full">
-          <p className="font-display text-xl font-bold">
-            {players.length} {players.length === 1 ? 'player' : 'players'} in the
-            room
+        <Card className="flex w-full flex-col gap-3">
+          <p className="font-display text-lg font-bold text-white/70">
+            {players.length} in the room
           </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <AnimatePresence>
+              {players.map((p) => {
+                const offline = p.connected === false
+                const isMe = p.id === uid
+                return (
+                  <motion.div
+                    key={p.id}
+                    layout
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: offline ? 0.45 : 1 }}
+                    exit={{ scale: 0.5, opacity: 0 }}
+                    transition={spring}
+                    className={[
+                      'flex items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3',
+                      isMe
+                        ? 'border-white/60 bg-white/15'
+                        : 'border-white/15 bg-white/5',
+                    ].join(' ')}
+                  >
+                    <span
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-lg"
+                      style={{ backgroundColor: p.color }}
+                      aria-hidden
+                    >
+                      {p.emoji}
+                    </span>
+                    <span className="max-w-[8rem] truncate font-display text-sm font-bold text-white">
+                      {p.name}
+                      {isMe && <span className="text-white/60"> (you)</span>}
+                    </span>
+                    {offline && (
+                      <span className="text-xs" title="reconnecting" aria-label="reconnecting">
+                        ⚠
+                      </span>
+                    )}
+                  </motion.div>
+                )
+              })}
+            </AnimatePresence>
+          </div>
         </Card>
         <Button variant="ghost" onClick={leave}>
           🚪 Leave Room
