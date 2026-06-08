@@ -43,6 +43,36 @@ export function clearSession(): void {
   }
 }
 
+// The room code from a ?room= deep link, stashed for the brief window between
+// detecting the link and the (lazy-loaded) join screen mounting. If a stale
+// cached bundle fails to load that chunk, the error boundary's cache-busting
+// reload re-reads this so the room code survives the reload. See [[ChunkErrorBoundary]].
+const PENDING_ROOM_KEY = 'ft.pendingRoom.v1'
+
+export function savePendingRoom(code: string): void {
+  try {
+    sessionStorage.setItem(PENDING_ROOM_KEY, code)
+  } catch {
+    /* ignore */
+  }
+}
+
+export function loadPendingRoom(): string | null {
+  try {
+    return sessionStorage.getItem(PENDING_ROOM_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function clearPendingRoom(): void {
+  try {
+    sessionStorage.removeItem(PENDING_ROOM_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
 export interface SavedHostSession {
   code: string
   deck: Question[]

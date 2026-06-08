@@ -2,9 +2,10 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGame } from './store/gameStore'
 import { useMpStore } from './multiplayer/mpStore'
-import { loadSession, loadHostSession } from './multiplayer/session'
+import { loadSession, loadHostSession, savePendingRoom } from './multiplayer/session'
 import { AudioProvider } from './hooks/useAudio'
 import { AnimatedBackground } from './components/ui/AnimatedBackground'
+import { ChunkErrorBoundary } from './components/ChunkErrorBoundary'
 import { MuteButton } from './components/ui/MuteButton'
 import { HomeScreen } from './components/screens/HomeScreen'
 import { ModeScreen } from './components/screens/ModeScreen'
@@ -143,8 +144,13 @@ export default function App() {
     const params = new URLSearchParams(window.location.search)
     const room = params.get('room')
     if (room) {
-      setJoinCodePrefill(room.toUpperCase().slice(0, 8))
+      const code = room.toUpperCase().slice(0, 8)
+      setJoinCodePrefill(code)
       setScreen('mpJoin')
+      // Stash the code so a stale-bundle reload (the join screen is lazy-loaded)
+      // can re-add it and survive the cache-busting reload. Cleared once the
+      // join screen actually mounts (see MpJoinScreen).
+      savePendingRoom(code)
       // Clean the URL so a refresh doesn't keep forcing the join screen.
       window.history.replaceState({}, '', window.location.pathname)
       return
@@ -171,24 +177,26 @@ export default function App() {
             NOT use AnimatePresence exit animations here: a lazy screen exiting
             while it re-renders (e.g. its room is deleted on the way out) hung the
             transition on a blank screen. An enter-only animation is bug-free. */}
-        <Suspense
-          fallback={
-            <div className="relative z-10 flex min-h-screen items-center justify-center font-display text-xl font-bold text-white/80">
-              Loading…
-            </div>
-          }
-        >
-          <motion.div
-            key={screen}
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-            className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-6 sm:px-6"
+        <ChunkErrorBoundary>
+          <Suspense
+            fallback={
+              <div className="relative z-10 flex min-h-screen items-center justify-center font-display text-xl font-bold text-white/80">
+                Loading…
+              </div>
+            }
           >
-            <Current />
-          </motion.div>
-        </Suspense>
+            <motion.div
+              key={screen}
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+              className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-6 sm:px-6"
+            >
+              <Current />
+            </motion.div>
+          </Suspense>
+        </ChunkErrorBoundary>
       </div>
     </AudioProvider>
   )

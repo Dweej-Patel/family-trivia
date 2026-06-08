@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGame } from '../../store/gameStore'
 import { useMpStore } from '../../multiplayer/mpStore'
 import { joinRoom } from '../../multiplayer/room'
-import { saveSession } from '../../multiplayer/session'
+import { saveSession, clearPendingRoom } from '../../multiplayer/session'
 import { useAudio } from '../../hooks/useAudio'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
@@ -40,6 +40,12 @@ function sanitizeCode(raw: string): string {
 export function MpJoinScreen() {
   const setScreen = useGame((s) => s.setScreen)
   const { play } = useAudio()
+
+  // The join screen mounted, so its chunk loaded fine — drop the deep-link
+  // stash the error boundary would otherwise use to recover from a stale bundle.
+  useEffect(() => {
+    clearPendingRoom()
+  }, [])
 
   const [code, setCode] = useState(() =>
     sanitizeCode(useMpStore.getState().joinCodePrefill),
