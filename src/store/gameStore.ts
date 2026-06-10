@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
 import type { GameState, GameConfig, Question } from '../types'
 import { starterQuestions } from '../data/starterQuestions'
-import { shuffle, uid } from '../lib/shuffle'
+import { shuffle, shuffleQuestionOptions, uid } from '../lib/shuffle'
 import { storage } from '../lib/storage'
 
 const DEFAULT_CONFIG: GameConfig = {
@@ -62,25 +62,30 @@ export function planQuestions(
 }
 
 /** Pick the actual question objects for a game (filtered, shuffled, sliced to
- *  questionCount). Used by multiplayer, which is simultaneous — every player
- *  answers every question — so no per-player division is needed. */
+ *  questionCount, answer options randomized per game). Used by multiplayer,
+ *  which is simultaneous — every player answers every question — so no
+ *  per-player division is needed. */
 export function selectQuestions(questions: Question[], config: GameConfig): Question[] {
   const pool = filterPool(questions, config)
-  return shuffle(pool).slice(0, Math.max(1, config.questionCount))
+  return shuffle(pool)
+    .slice(0, Math.max(1, config.questionCount))
+    .map(shuffleQuestionOptions)
 }
 
 /** Build the play deck — length is divisible by the player count so the turn
- *  rotation gives every player an equal number of questions. */
+ *  rotation gives every player an equal number of questions. The deck holds
+ *  question snapshots (not ids) so each game gets its own randomized option
+ *  order, used consistently for both rendering and scoring. */
 function buildDeck(
   questions: Question[],
   config: GameConfig,
   playerCount: number,
-): string[] {
+): Question[] {
   const pool = filterPool(questions, config)
   const { total } = planQuestions(questions, config, playerCount)
   return shuffle(pool)
     .slice(0, total)
-    .map((q) => q.id)
+    .map(shuffleQuestionOptions)
 }
 
 export const useGame = create<GameState>((set) => ({
@@ -192,7 +197,7 @@ export const useGame = create<GameState>((set) => ({
   reveal: () =>
     set((s) => {
       if (s.revealed || s.selectedAnswer === null) return s
-      const q = s.questions.find((x) => x.id === s.deck[s.currentIndex])
+      const q = s.deck[s.currentIndex]
       const correct = q ? s.selectedAnswer === q.correctIndex : false
       let players = s.players
       if (correct && players.length > 0) {
@@ -252,7 +257,7 @@ export const useGame = create<GameState>((set) => ({
 
 /** Selector helper: the current question object (or undefined). */
 export function useCurrentQuestion(): Question | undefined {
-  return useGame((s) => s.questions.find((q) => q.id === s.deck[s.currentIndex]))
+  return useGame((s) => s.deck[s.currentIndex])
 }
 
 /** Derive the sorted unique category list from the current library.

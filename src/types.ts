@@ -76,8 +76,9 @@ export interface GameState {
   setConfig: (patch: Partial<GameConfig>) => void
 
   // ── Active game ──
-  /** Question ids selected for the current game, in play order. */
-  deck: string[]
+  /** Question snapshots for the current game, in play order (options
+   *  pre-shuffled per game, correctIndex remapped to match). */
+  deck: Question[]
   currentIndex: number
   /** Index of the player whose turn it is. */
   activePlayerIndex: number
