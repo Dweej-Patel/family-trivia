@@ -363,42 +363,61 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 py-4">
-      {/* ── Header: progress + timer ── */}
-      <div className="flex items-center justify-between font-display text-sm font-bold text-white/70">
+      {/* ── Header: progress (the corner stays clear of the floating mute) ── */}
+      <div className="font-display text-sm font-bold text-white/70">
         <span>
           Question {questionIndex + 1}
           {totalQuestions > 0 ? ` of ${totalQuestions}` : ''}
         </span>
-        {pacing === 'timed' && remaining !== null && status === 'question' && (
+      </div>
+
+      {/* ── Timer: a full-width countdown bar (matches the host screen) with a
+          big seconds readout — visible at a glance, nothing can cover it. ── */}
+      {pacing === 'timed' && remaining !== null && status === 'question' && (
+        <div className="flex items-center gap-3">
+          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/10">
+            <motion.div
+              className="h-full rounded-full"
+              style={{
+                background: 'linear-gradient(90deg, #34d399, #fbbf24, #f97316)',
+              }}
+              animate={{
+                width: `${(remaining / Math.max(1, question.timerSeconds)) * 100}%`,
+              }}
+              transition={{ ease: 'linear', duration: 0.2 }}
+            />
+          </div>
           <motion.span
             key={Math.ceil(remaining)}
-            initial={{ scale: 1.3 }}
+            initial={{ scale: remaining <= 5 ? 1.35 : 1.1 }}
             animate={{ scale: 1 }}
             className={[
-              'rounded-full px-3 py-1 font-display text-base tabular-nums',
-              remaining <= 5
-                ? 'bg-red-500/30 text-red-200'
-                : 'bg-white/10 text-white',
+              'w-12 text-right font-display text-2xl font-black tabular-nums',
+              remaining <= 5 ? 'text-red-300' : 'text-white',
             ].join(' ')}
           >
-            {Math.ceil(remaining)}s
+            {Math.ceil(remaining)}
           </motion.span>
-        )}
-        {pacing === 'manual' &&
-          remaining !== null &&
-          remaining > 0 &&
-          status === 'question' &&
-          !locked && (
+        </div>
+      )}
+
+      {/* Manual pacing: the fading speed-bonus hint, same slot as the bar. */}
+      {pacing === 'manual' &&
+        remaining !== null &&
+        remaining > 0 &&
+        status === 'question' &&
+        !locked && (
+          <div className="flex justify-center">
             <motion.span
               initial={{ scale: 1.2 }}
               animate={{ scale: 1 }}
-              className="rounded-full bg-sunny/25 px-3 py-1 font-display text-base tabular-nums text-sunny"
+              className="rounded-full bg-sunny/25 px-4 py-1 font-display text-base tabular-nums text-sunny"
               title="Answer quickly for bonus points"
             >
-              ⚡ +{Math.round((remaining / MANUAL_BONUS_WINDOW) * 100)}
+              ⚡ Speed bonus: +{Math.round((remaining / MANUAL_BONUS_WINDOW) * 100)}
             </motion.span>
-          )}
-      </div>
+          </div>
+        )}
 
       {/* ── Prompt ── */}
       <Card>
