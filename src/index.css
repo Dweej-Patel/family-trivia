@@ -19,6 +19,24 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
   background: #2e1065;
+  /* No pull-to-refresh / scroll chaining: an accidental swipe-down
+     mid-question shouldn't reload the game. */
+  overscroll-behavior-y: none;
+}
+
+button,
+a,
+select {
+  /* `manipulation` removes the double-tap-to-zoom delay on mobile browsers,
+     so answer taps register immediately. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  /* No long-press text-selection / callout popups on game buttons. */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* Hide scrollbars but keep scroll */

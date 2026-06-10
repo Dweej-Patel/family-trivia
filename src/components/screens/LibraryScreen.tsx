@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGame, useCategories } from '../../store/gameStore'
-import { starterQuestions } from '../../data/starterQuestions'
+import { loadStarterQuestions } from '../../data/starterQuestions'
 import type { Difficulty, Question, QuestionType } from '../../types'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
@@ -132,6 +132,11 @@ export function LibraryScreen() {
   const [packs, setPacks] = useState<PackInfo[]>([])
   const [selectedPack, setSelectedPack] = useState<string>('')
   const [packLoading, setPackLoading] = useState(false)
+  // The starter pack is a lazy chunk; load its size for the labels below.
+  const [starterCount, setStarterCount] = useState<number | null>(null)
+  useEffect(() => {
+    void loadStarterQuestions().then((qs) => setStarterCount(qs.length))
+  }, [])
 
   const showToast = (t: Toast) => {
     setToast(t)
@@ -159,7 +164,7 @@ export function LibraryScreen() {
     if (!selectedPack) return
     if (selectedPack === DEFAULT_PACK) {
       const ok = window.confirm(
-        `Load the default starter pack (${starterQuestions.length} questions)?\n\n` +
+        `Load the default starter pack${starterCount ? ` (${starterCount} questions)` : ''}?\n\n` +
           'This REPLACES your current library.',
       )
       if (!ok) return
@@ -461,7 +466,7 @@ export function LibraryScreen() {
           >
             <option value="">Choose a pack…</option>
             <option value={DEFAULT_PACK}>
-              ⭐ Default starter pack ({starterQuestions.length})
+              ⭐ Default starter pack{starterCount ? ` (${starterCount})` : ''}
             </option>
             {packs.map((p) => (
               <option key={p.id} value={p.id}>

@@ -53,7 +53,10 @@ export function ConfigScreen() {
   // filters drops the pool below the chosen count, auto-adjust it down.
   const poolSize = filteredPoolSize(questions, config)
   useEffect(() => {
-    if (config.questionCount > poolSize) setConfig({ questionCount: poolSize })
+    // poolSize 0 means the library hasn't hydrated yet — don't zero the count.
+    if (poolSize > 0 && config.questionCount > poolSize) {
+      setConfig({ questionCount: poolSize })
+    }
   }, [poolSize, config.questionCount, setConfig])
 
   const toggleCategory = (cat: string) => {
@@ -205,7 +208,9 @@ export function ConfigScreen() {
         <Button variant="ghost" onClick={() => setScreen('setup')}>
           ← Back
         </Button>
-        <Button size="lg" onClick={handleStart}>
+        {/* Disabled while the library is still hydrating (an empty pool would
+            start a zero-question game). */}
+        <Button size="lg" onClick={handleStart} disabled={poolSize === 0}>
           🚀 Start Game!
         </Button>
       </div>

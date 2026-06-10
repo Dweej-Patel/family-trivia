@@ -71,7 +71,10 @@ export function MpHostSetupScreen() {
   // filters drops the pool below the chosen count, auto-adjust it down.
   const poolSize = filteredPoolSize(questions, config)
   useEffect(() => {
-    if (config.questionCount > poolSize) setConfig({ questionCount: poolSize })
+    // poolSize 0 means the library hasn't hydrated yet — don't zero the count.
+    if (poolSize > 0 && config.questionCount > poolSize) {
+      setConfig({ questionCount: poolSize })
+    }
   }, [poolSize, config.questionCount, setConfig])
 
   const toggleCategory = (cat: string) => {
@@ -267,7 +270,9 @@ export function MpHostSetupScreen() {
         >
           ← Back
         </Button>
-        <Button size="lg" onClick={handleCreate}>
+        {/* Disabled while the library is still hydrating (empty pool would
+            create a room with no questions). */}
+        <Button size="lg" onClick={handleCreate} disabled={poolSize === 0}>
           {editingCode ? 'Save Settings 💾' : 'Create Room 🚀'}
         </Button>
       </div>

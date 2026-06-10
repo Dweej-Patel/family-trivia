@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
 import type { GameState, GameConfig, Question } from '../types'
-import { starterQuestions } from '../data/starterQuestions'
+import { loadStarterQuestions } from '../data/starterQuestions'
 import { shuffle, shuffleQuestionOptions, uid } from '../lib/shuffle'
 import { storage } from '../lib/storage'
 
@@ -15,7 +15,11 @@ const DEFAULT_CONFIG: GameConfig = {
 }
 
 // Seed from localStorage when present, otherwise fall back to defaults.
-const initialQuestions = storage.loadQuestions() ?? starterQuestions
+// With no saved library the store starts empty and the starter pack hydrates
+// in the background (see below) — keeping the heavy question data off the
+// main bundle's critical path.
+const savedQuestions = storage.loadQuestions()
+const initialQuestions = savedQuestions ?? []
 const initialPlayers = storage.loadPlayers() ?? []
 const initialConfig = { ...DEFAULT_CONFIG, ...(storage.loadConfig() ?? {}) }
 
@@ -153,11 +157,14 @@ export const useGame = create<GameState>((set) => ({
       storage.saveQuestions(questions)
       return { questions }
     }),
-  resetQuestionsToStarter: () =>
-    set(() => {
-      storage.saveQuestions(starterQuestions)
-      return { questions: starterQuestions }
-    }),
+  resetQuestionsToStarter: () => {
+    // The starter pack is a lazy chunk; swap it in once loaded (instant when
+    // already cached by the boot-time hydration below).
+    void loadStarterQuestions().then((starter) => {
+      storage.saveQuestions(starter)
+      set({ questions: starter })
+    })
+  },
 
   // ── Config ──
   config: initialConfig,
@@ -254,6 +261,17 @@ export const useGame = create<GameState>((set) => ({
       revealed: false,
     }),
 }))
+
+// No saved library — hydrate the default starter pack in the background. The
+// fetch starts at boot (parallel with first render), so the library is ready
+// well before anyone reaches a screen that needs it. Skipped entirely once the
+// user has saved questions of their own.
+if (!savedQuestions) {
+  void loadStarterQuestions().then((starter) => {
+    // Don't clobber a library the user imported while the chunk was loading.
+    useGame.setState((s) => (s.questions.length === 0 ? { questions: starter } : {}))
+  })
+}
 
 /** Selector helper: the current question object (or undefined). */
 export function useCurrentQuestion(): Question | undefined {

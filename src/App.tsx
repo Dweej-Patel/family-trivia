@@ -166,6 +166,25 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // After first paint, quietly pre-download the lazy multiplayer chunks so
+  // tapping Host/Join is instant instead of waiting on a network fetch — and so
+  // a redeploy mid-session can't 404 a chunk this build still needs.
+  useEffect(() => {
+    const warm = () => {
+      void import('./components/screens/MpJoinScreen')
+      void import('./components/screens/MpHostSetupScreen')
+      void import('./components/screens/MpHostScreen')
+      void import('./components/screens/MpPlayerScreen')
+    }
+    // Safari has no requestIdleCallback — fall back to a short timeout.
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(warm, { timeout: 4000 })
+      return () => window.cancelIdleCallback(id)
+    }
+    const t = window.setTimeout(warm, 2500)
+    return () => window.clearTimeout(t)
+  }, [])
+
   return (
     <AudioProvider>
       <div className="relative min-h-full w-full overflow-hidden text-white">
