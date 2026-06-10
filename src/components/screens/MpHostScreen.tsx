@@ -8,7 +8,9 @@ import { useGame, selectQuestions } from '../../store/gameStore'
 import { useAudio } from '../../hooks/useAudio'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
+import { RotatingTagline } from '../ui/RotatingTagline'
 import { fireWinner } from '../ui/ConfettiBurst'
+import { ANSWER_COLORS, ANSWER_SHAPES } from '../../lib/answerStyle'
 import { Leaderboard } from '../game/Leaderboard'
 import { Podium } from '../game/Podium'
 import type { Difficulty } from '../../types'
@@ -19,9 +21,14 @@ const difficultyStyles: Record<Difficulty, { label: string; className: string }>
   hard: { label: 'Hard', className: 'bg-red-500/20 text-red-400 border-red-500/50' },
 }
 
-// A/B/C/D tile colors (brand palette).
-const TILE_COLORS = ['#ec4899', '#38bdf8', '#fbbf24', '#34d399']
-const TILE_LETTERS = ['A', 'B', 'C', 'D']
+// Playful waiting lines for the lobby.
+const LOBBY_LINES = [
+  'Waiting for players to join…',
+  'Beam the QR code around 📡',
+  'Grandma counts as two players 👵',
+  'Winner picks the next movie 🍿',
+  'No googling — we see you 👀',
+]
 
 export function MpHostScreen() {
   const deck = useMpStore((s) => s.hostDeck)
@@ -262,13 +269,10 @@ export function MpHostScreen() {
 
             {players.length === 0 ? (
               <Card className="flex items-center justify-center py-10 text-center">
-                <motion.p
-                  animate={{ opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 1.6, repeat: Infinity }}
+                <RotatingTagline
+                  lines={LOBBY_LINES}
                   className="font-body text-lg font-semibold text-white/70"
-                >
-                  Waiting for players to join…
-                </motion.p>
+                />
               </Card>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -410,7 +414,7 @@ export function MpHostScreen() {
           {currentQuestion.options.map((opt, i) => {
             const isCorrect = i === currentQuestion.correctIndex
             const dim = isReveal && !isCorrect
-            const tileColor = TILE_COLORS[i % TILE_COLORS.length]
+            const tileColor = ANSWER_COLORS[i % ANSWER_COLORS.length]
             return (
               <motion.div
                 key={`${currentIndex}-${i}`}
@@ -434,7 +438,7 @@ export function MpHostScreen() {
                   style={{ backgroundColor: tileColor }}
                   aria-hidden
                 >
-                  {TILE_LETTERS[i]}
+                  {ANSWER_SHAPES[i % ANSWER_SHAPES.length]}
                 </div>
                 <span className="flex-1 font-display text-xl font-bold text-white sm:text-2xl">
                   {opt}

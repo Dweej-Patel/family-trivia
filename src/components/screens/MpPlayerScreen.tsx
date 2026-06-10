@@ -12,10 +12,18 @@ import { useAudio } from '../../hooks/useAudio'
 import { fireConfetti } from '../ui/ConfettiBurst'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
+import { RotatingTagline } from '../ui/RotatingTagline'
+import { ANSWER_COLORS, ANSWER_SHAPES } from '../../lib/answerStyle'
+import { buzz } from '../../lib/haptics'
 
-// Bright answer-tile palette (cycled if there are >4 options).
-const ANSWER_COLORS = ['#ef4444', '#38bdf8', '#fbbf24', '#34d399', '#7c3aed', '#ec4899']
-const ANSWER_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F']
+// Playful waiting lines for the lobby.
+const WAITING_LINES = [
+  'Waiting for the host to start…',
+  'Limber up those answer fingers 🖐️',
+  'Fast answers score more — be quick ⚡',
+  'Trash talk now, glory later 🏆',
+  'Eyes on the big screen 📺',
+]
 
 const spring = { type: 'spring', stiffness: 320, damping: 24 } as const
 
@@ -113,17 +121,36 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
   const revealSoundFor = useRef<number | null>(null)
   const finishFired = useRef(false)
 
+  // Streak of consecutive correct answers — fuels the 🔥 badge on reveal.
+  const [streak, setStreak] = useState(0)
+
   useEffect(() => {
     if (status !== 'reveal' || !question) return
+    // The reveal is one atomic write on the host, but it reaches us through two
+    // separate subscriptions — the status flip can render a beat before our
+    // answer's correct/awarded result does. Wait for the verdict before judging,
+    // or a correct answer can play the "wrong" cue and break the streak.
+    if (myAnswer && myAnswer.correct === undefined) return
     if (revealSoundFor.current === question.index) return
     revealSoundFor.current = question.index
     if (myAnswer?.correct) {
       fireConfetti()
       play('correct')
-    } else if (myAnswer) {
-      play('wrong')
+      buzz([30, 40, 30])
+      setStreak((s) => s + 1)
+    } else {
+      if (myAnswer) {
+        play('wrong')
+        buzz(80)
+      }
+      setStreak(0)
     }
   }, [status, question, myAnswer, play])
+
+  // New game in the same room (host hit Play Again) — reset the streak.
+  useEffect(() => {
+    if (status === 'lobby') setStreak(0)
+  }, [status])
 
   useEffect(() => {
     // Reset the guard when a new game starts (host hit "Play Again") so the
@@ -201,9 +228,10 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
           {me?.name ?? 'You'}
         </h1>
         <p className="font-display text-2xl font-bold">You&apos;re in! 🎉</p>
-        <p className="font-body text-lg text-white/70">
-          Waiting for the host to start…
-        </p>
+        <RotatingTagline
+          lines={WAITING_LINES}
+          className="font-body text-lg text-white/70"
+        />
         <Card className="flex w-full flex-col gap-3">
           <p className="font-display text-lg font-bold text-white/70">
             {players.length} in the room
@@ -393,6 +421,7 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
           const handleTap = () => {
             if (locked || isReveal || status !== 'question') return
             play('select')
+            buzz(12)
             answer(i)
           }
 
@@ -419,8 +448,11 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
               ].join(' ')}
               style={{ backgroundColor: color }}
             >
-              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-black/25 text-xl">
-                {ANSWER_LETTERS[i] ?? i + 1}
+              <span
+                className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-black/25 text-xl"
+                aria-hidden
+              >
+                {ANSWER_SHAPES[i % ANSWER_SHAPES.length]}
               </span>
               <span className="flex-1">{opt}</span>
               {isCorrectOption && <span className="text-2xl">✓</span>}
@@ -461,9 +493,21 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
                 Time&apos;s up! ⏰
               </p>
             ) : myAnswer.correct ? (
-              <p className="font-display text-4xl font-bold text-mint">
-                Correct! ✓ +{myAnswer.awarded ?? 0}
-              </p>
+              <>
+                <p className="font-display text-4xl font-bold text-mint">
+                  Correct! ✓ +{myAnswer.awarded ?? 0}
+                </p>
+                {streak >= 2 && (
+                  <motion.p
+                    initial={{ scale: 0, rotate: -8 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 14 }}
+                    className="rounded-full bg-tangerine/25 px-4 py-1.5 font-display text-xl font-bold text-sunny"
+                  >
+                    🔥 {streak} in a row!
+                  </motion.p>
+                )}
+              </>
             ) : (
               <>
                 <p className="font-display text-4xl font-bold text-red-400">
