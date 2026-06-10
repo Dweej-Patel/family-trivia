@@ -426,31 +426,44 @@ export function AudioProvider({
     if (!master) return
 
     const musicGain = ctx.createGain()
-    musicGain.gain.value = MUSIC_GAIN
+    // Fade in over a moment so the loop never pops when it (re)starts.
+    musicGain.gain.setValueAtTime(0.0001, ctx.currentTime)
+    musicGain.gain.exponentialRampToValueAtTime(MUSIC_GAIN, ctx.currentTime + 1.2)
     musicGain.connect(master)
     musicGainRef.current = musicGain
     musicStepRef.current = 0
 
-    // An 8-bar progression in two phrases so the loop is less obvious.
-    // Each bar carries a bass root + a sustained chord (pad).
+    // An 8-bar progression in two phrases. Seventh-chord voicings (low→high)
+    // give the pad a warmer, less nursery-rhyme color than plain triads.
     const progression: Array<{ bass: number; chord: number[] }> = [
-      // Phrase A: C – Am – F – G
-      { bass: 65.41, chord: [261.63, 329.63, 392.0] }, // C  : C4 E4 G4
-      { bass: 110.0, chord: [220.0, 261.63, 329.63] }, // Am : A3 C4 E4
-      { bass: 87.31, chord: [174.61, 220.0, 261.63] }, // F  : F3 A3 C4
-      { bass: 98.0, chord: [196.0, 246.94, 293.66] }, // G  : G3 B3 D4
-      // Phrase B: C – Em – Dm – G
-      { bass: 65.41, chord: [261.63, 329.63, 392.0] }, // C  : C4 E4 G4
-      { bass: 82.41, chord: [164.81, 196.0, 246.94] }, // Em : E3 G3 B3
-      { bass: 73.42, chord: [146.83, 174.61, 220.0] }, // Dm : D3 F3 A3
-      { bass: 98.0, chord: [196.0, 246.94, 293.66] }, // G  : G3 B3 D4
+      // Phrase A: Cmaj7 – Am7 – Fmaj7 – G(add9)
+      { bass: 65.41, chord: [261.63, 329.63, 392.0, 493.88] }, // C4 E4 G4 B4
+      { bass: 55.0, chord: [220.0, 261.63, 329.63, 392.0] }, // A3 C4 E4 G4
+      { bass: 87.31, chord: [174.61, 220.0, 261.63, 329.63] }, // F3 A3 C4 E4
+      { bass: 98.0, chord: [196.0, 246.94, 293.66, 440.0] }, // G3 B3 D4 A4
+      // Phrase B: Cmaj7 – Em7 – Dm7 – G7
+      { bass: 65.41, chord: [261.63, 329.63, 392.0, 493.88] }, // C4 E4 G4 B4
+      { bass: 82.41, chord: [164.81, 196.0, 246.94, 293.66] }, // E3 G3 B3 D4
+      { bass: 73.42, chord: [146.83, 174.61, 220.0, 261.63] }, // D3 F3 A3 C4
+      { bass: 98.0, chord: [196.0, 246.94, 293.66, 349.23] }, // G3 B3 D4 F4
     ]
-    // C-major pentatonic — always consonant over the chords above. The melody
-    // picks from these with rests + jitter so each bar sounds a little different.
-    const LEAD = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5]
-    const stepMs = 2000 // one bar
+    const stepMs = 2000 // one bar (120 bpm, 4 beats)
     const barLen = 1.9
     const rand = () => Math.random()
+
+    // Composed melody motifs instead of uniform random notes — each note is an
+    // index into the BAR'S chord tones (played an octave up), so the melody
+    // always lands on the harmony and has an intentional contour.
+    // [slot seconds, chord-tone index, duration seconds]
+    const MOTIFS: Array<Array<[number, number, number]>> = [
+      [[0, 0, 0.4], [0.5, 1, 0.4], [1.0, 2, 0.4], [1.5, 3, 0.6]], // rising arch
+      [[0, 3, 0.4], [0.5, 2, 0.4], [1.0, 1, 0.4], [1.5, 0, 0.6]], // gentle descent
+      [[0, 2, 0.7], [1.0, 3, 0.7]], // two long calls
+      [[0.25, 0, 0.3], [0.75, 1, 0.3], [1.25, 2, 0.6]], // syncopated lift
+      [[0, 1, 0.3], [0.5, 2, 0.3], [1.0, 1, 0.3], [1.5, 0, 0.6]], // turn
+      [[0.5, 2, 1.1]], // breath — one held note
+    ]
+    let lastMotif = -1
 
     const playStep = (): void => {
       const mg = musicGainRef.current
@@ -458,76 +471,73 @@ export function AudioProvider({
       // Guard the whole bar: a single scheduling hiccup must never tear down
       // the interval and silence the music.
       try {
-      const bar = progression[musicStepRef.current % progression.length]
-      const t = ctx.currentTime
+        const step = musicStepRef.current
+        const bar = progression[step % progression.length]
+        const t = ctx.currentTime
 
-      // ── Bass: warm root with a gentle mid-bar pulse for movement ──
-      tone(ctx, mg, {
-        type: 'triangle',
-        freq: bar.bass,
-        start: t,
-        duration: barLen,
-        peak: 0.5,
-        attack: 0.04,
-        release: 0.4,
-      })
-      tone(ctx, mg, {
-        type: 'triangle',
-        freq: bar.bass,
-        start: t + 1.0,
-        duration: 0.85,
-        peak: 0.36,
-        attack: 0.04,
-        release: 0.3,
-      })
+        // ── Bass: a walking-ish groove (root · push · fifth · root) ──
+        const fifth = bar.bass * 1.5
+        tone(ctx, mg, { type: 'triangle', freq: bar.bass, start: t, duration: 0.55, peak: 0.5, attack: 0.02, release: 0.18 })
+        tone(ctx, mg, { type: 'triangle', freq: bar.bass, start: t + 0.75, duration: 0.2, peak: 0.3, attack: 0.02, release: 0.08 })
+        tone(ctx, mg, { type: 'triangle', freq: fifth, start: t + 1.0, duration: 0.4, peak: 0.38, attack: 0.02, release: 0.14 })
+        tone(ctx, mg, { type: 'triangle', freq: bar.bass, start: t + 1.5, duration: 0.42, peak: 0.42, attack: 0.02, release: 0.16 })
 
-      // ── Pad: sustained chord, soft sines fanned in slightly ──
-      bar.chord.forEach((f, i) => {
-        tone(ctx, mg, {
-          type: 'sine',
-          freq: f,
-          start: t + i * 0.04,
-          duration: barLen,
-          peak: 0.2,
-          attack: 0.3,
-          release: 0.6,
+        // ── Pad: sustained 7th chord, each note doubled slightly detuned for a
+        //    soft chorus warmth ──
+        bar.chord.forEach((f, i) => {
+          tone(ctx, mg, { type: 'sine', freq: f, start: t + i * 0.03, duration: barLen, peak: 0.13, attack: 0.3, release: 0.6 })
+          tone(ctx, mg, { type: 'sine', freq: f * 1.004, start: t + i * 0.03, duration: barLen, peak: 0.06, attack: 0.35, release: 0.6 })
         })
-      })
 
-      // ── Melody: four eighth-note slots, some left as rests, notes vary ──
-      for (let s = 0; s < 4; s++) {
-        if (rand() < 0.4) continue // rest — keeps it from feeling busy/looped
-        const note = LEAD[Math.floor(rand() * LEAD.length)]
-        const jitter = (rand() - 0.5) * 0.05 // subtle human timing
-        // Clamp so timing jitter can never push the start before `t` (which
-        // would be a negative AudioParam time right after the context resumes).
-        const noteStart = Math.max(t, t + s * 0.5 + jitter)
-        tone(ctx, mg, {
-          type: 'triangle',
-          freq: note,
-          start: noteStart,
-          duration: 0.42,
-          peak: 0.16,
-          attack: 0.01,
-          release: 0.12,
-        })
-      }
+        // ── Percussion (very quiet — felt more than heard) ──
+        // Kick on beats 1 & 3: a fast sine pitch-drop.
+        tone(ctx, mg, { type: 'sine', freq: 150, endFreq: 45, start: t, duration: 0.13, peak: 0.5, attack: 0.002, release: 0.1 })
+        tone(ctx, mg, { type: 'sine', freq: 150, endFreq: 45, start: t + 1.0, duration: 0.13, peak: 0.4, attack: 0.002, release: 0.1 })
+        // Brushed backbeat on 2 & 4.
+        noiseBurst(ctx, mg, { start: t + 0.5, duration: 0.09, peak: 0.05, startFreq: 1800, endFreq: 900 })
+        noiseBurst(ctx, mg, { start: t + 1.5, duration: 0.09, peak: 0.055, startFreq: 1800, endFreq: 900 })
+        // Hats on the eighths — offbeats swung late and quieter for a lofi lilt.
+        for (let e = 0; e < 8; e++) {
+          const off = e % 2 === 1
+          noiseBurst(ctx, mg, {
+            start: t + e * 0.25 + (off ? 0.045 : 0),
+            duration: 0.03,
+            peak: off ? 0.022 : 0.04,
+            startFreq: 7500,
+            endFreq: 6000,
+          })
+        }
 
-      // ── Sparkle: occasional high shimmer for color ──
-      if (rand() < 0.45) {
-        const sparkle = LEAD[Math.floor(rand() * LEAD.length)] * 2
-        tone(ctx, mg, {
-          type: 'sine',
-          freq: sparkle,
-          start: t + 1.5,
-          duration: 0.3,
-          peak: 0.07,
-          attack: 0.005,
-          release: 0.15,
-        })
-      }
+        // ── Melody: pick a motif (phrase ends breathe; never repeat twice) ──
+        const phraseEnd = step % 4 === 3
+        if (rand() > 0.15) {
+          let mi = phraseEnd ? (rand() < 0.6 ? 5 : 1) : Math.floor(rand() * 5)
+          if (mi === lastMotif) mi = (mi + 1) % MOTIFS.length
+          lastMotif = mi
+          for (const [slot, toneIdx, dur] of MOTIFS[mi]) {
+            const freq = bar.chord[toneIdx % bar.chord.length] * 2
+            const jitter = (rand() - 0.5) * 0.04 // subtle human timing
+            // Clamp so jitter can never schedule before `t` (a negative
+            // AudioParam time right after the context resumes).
+            tone(ctx, mg, {
+              type: 'triangle',
+              freq,
+              start: Math.max(t, t + slot + jitter),
+              duration: dur,
+              peak: 0.13 + rand() * 0.05,
+              attack: 0.015,
+              release: 0.14,
+            })
+          }
+        }
 
-      musicStepRef.current += 1
+        // ── Sparkle: occasional high shimmer, on a chord tone so it's never sour ──
+        if (rand() < 0.35) {
+          const sparkle = bar.chord[Math.floor(rand() * bar.chord.length)] * 4
+          tone(ctx, mg, { type: 'sine', freq: sparkle, start: t + 1.5, duration: 0.3, peak: 0.05, attack: 0.005, release: 0.15 })
+        }
+
+        musicStepRef.current += 1
       } catch {
         // Skip this bar; the next interval tick will try again.
         musicStepRef.current += 1
@@ -536,7 +546,7 @@ export function AudioProvider({
 
     playStep()
     musicIntervalRef.current = setInterval(playStep, stepMs)
-  }, [ensureCtx, tone])
+  }, [ensureCtx, tone, noiseBurst])
 
   const startMusic = useCallback((): void => {
     // Record intent, then try immediately. If audio is still locked (no user
