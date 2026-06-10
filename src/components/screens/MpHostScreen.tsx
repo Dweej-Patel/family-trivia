@@ -47,9 +47,16 @@ export function MpHostScreen() {
     start,
     reveal,
     next,
+    end,
     restart,
     close,
   } = game
+
+  // Cancel mid-game: jump straight to the podium with the scores as they
+  // stand. The room stays alive, so "Play Again" still works from there.
+  const endNow = () => {
+    if (window.confirm('End the game now and show the final scores?')) end()
+  }
 
   // Replay in the SAME room with fresh questions — keeps everyone connected.
   // Uses the CURRENT config (not the session's original pacing/timer) so any
@@ -353,6 +360,12 @@ export function MpHostScreen() {
             >
               {diff.label}
             </span>
+            <button
+              onClick={endNow}
+              className="rounded-full border border-white/20 bg-white/5 px-3 py-1 font-body text-sm font-bold text-white/60 transition-colors hover:bg-white/15 hover:text-white sm:text-base"
+            >
+              🏁 End game
+            </button>
           </div>
         </div>
 

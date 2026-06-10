@@ -297,8 +297,18 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
             </div>
           ))}
         </Card>
-        <Button onClick={leave} size="lg">
-          🚪 Leave
+        {/* Players used to bail here, not realizing the host can rematch in
+            this same room — make "stick around" the default. */}
+        <motion.p
+          animate={{ opacity: [0.6, 1, 0.6] }}
+          transition={{ duration: 1.8, repeat: Infinity }}
+          className="max-w-xs font-body text-base font-semibold text-white/70"
+        >
+          🔁 Stick around — if the host starts another round, you&apos;ll jump
+          back in automatically.
+        </motion.p>
+        <Button variant="ghost" onClick={leave}>
+          🚪 Done playing? Leave room
         </Button>
       </Shell>
     )
