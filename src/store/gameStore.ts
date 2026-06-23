@@ -185,7 +185,7 @@ export const useGame = create<GameState>((set) => ({
   startGame: () =>
     set((s) => {
       const deck = buildDeck(s.questions, s.config, s.players.length)
-      const players = s.players.map((p) => ({ ...p, score: 0 }))
+      const players = s.players.map((p) => ({ ...p, score: 0, streak: 0 }))
       storage.savePlayers(players)
       return {
         deck,
@@ -207,14 +207,31 @@ export const useGame = create<GameState>((set) => ({
       const q = s.deck[s.currentIndex]
       const correct = q ? s.selectedAnswer === q.correctIndex : false
       let players = s.players
-      if (correct && players.length > 0) {
-        const diffBonus = q?.difficulty === 'hard' ? 150 : q?.difficulty === 'medium' ? 120 : 100
-        players = players.map((p, i) =>
-          i === s.activePlayerIndex ? { ...p, score: p.score + diffBonus } : p,
-        )
+      if (players.length > 0) {
+        players = players.map((p, i) => {
+          if (i !== s.activePlayerIndex) return p
+          if (correct) {
+            const diffBonus =
+              q?.difficulty === 'hard' ? 150 : q?.difficulty === 'medium' ? 120 : 100
+            return { ...p, score: p.score + diffBonus, streak: (p.streak ?? 0) + 1 }
+          }
+          // A wrong answer snaps the streak back to zero.
+          return { ...p, streak: 0 }
+        })
         storage.savePlayers(players)
       }
       return { revealed: true, players }
+    }),
+
+  // Time ran out with no answer locked in — break the active player's streak.
+  breakStreak: () =>
+    set((s) => {
+      if (s.players.length === 0) return s
+      const players = s.players.map((p, i) =>
+        i === s.activePlayerIndex ? { ...p, streak: 0 } : p,
+      )
+      storage.savePlayers(players)
+      return { players }
     }),
 
   nextQuestion: () =>
@@ -239,7 +256,7 @@ export const useGame = create<GameState>((set) => ({
 
   playAgain: () =>
     set((s) => {
-      const players = s.players.map((p) => ({ ...p, score: 0 }))
+      const players = s.players.map((p) => ({ ...p, score: 0, streak: 0 }))
       storage.savePlayers(players)
       return {
         players,

@@ -2,10 +2,18 @@ import confetti from 'canvas-confetti'
 
 const BRAND_COLORS = ['#7c3aed', '#ec4899', '#f97316', '#fbbf24', '#34d399', '#38bdf8']
 
-/** A quick celebratory burst from the center and both sides. */
-export function fireConfetti() {
+/** Tint the burst toward a player's color (still festive) when one is given. */
+function paletteFor(accent?: string): string[] {
+  if (!accent) return BRAND_COLORS
+  // Weight the accent so the burst clearly belongs to that player.
+  return [accent, accent, accent, '#fbbf24', '#ffffff', '#38bdf8']
+}
+
+/** A quick celebratory burst from the center and both sides. Pass a player's
+ *  hex color to tint it toward them. */
+export function fireConfetti(accent?: string) {
   const base: confetti.Options = {
-    colors: BRAND_COLORS,
+    colors: paletteFor(accent),
     zIndex: 9999,
     disableForReducedMotion: true,
   }

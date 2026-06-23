@@ -36,6 +36,9 @@ export interface Player {
   emoji: string
   color: string // hex
   score: number
+  /** Current run of consecutive correct answers (single-device mode), used for
+   *  streak flair + Brainy's neuron charge. Absent/0 = no streak. */
+  streak?: number
 }
 
 export interface GameConfig {
@@ -89,6 +92,8 @@ export interface GameState {
   startGame: () => void
   selectAnswer: (optionIndex: number) => void
   reveal: () => void
+  /** Reset the active player's streak when a timed question expires unanswered. */
+  breakStreak: () => void
   nextQuestion: () => void
   playAgain: () => void
   resetGame: () => void

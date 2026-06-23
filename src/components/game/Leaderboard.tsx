@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import type { Player } from '../../types'
 import { rankPlayers } from '../../lib/ranking'
+import { RollingNumber } from '../ui/RollingNumber'
 
 const RANK_MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' }
 
@@ -78,15 +79,10 @@ export function Leaderboard({
                 <span className="truncate font-display text-base font-bold text-white sm:text-lg">
                   {player.name}
                 </span>
-                <motion.span
-                  key={player.score}
-                  initial={{ scale: 1.4, color: '#fbbf24' }}
-                  animate={{ scale: 1, color: '#ffffff' }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                  className="shrink-0 font-display text-base font-bold tabular-nums sm:text-lg"
-                >
-                  {player.score}
-                </motion.span>
+                <RollingNumber
+                  value={player.score}
+                  className="shrink-0 font-display text-base font-bold tabular-nums text-white sm:text-lg"
+                />
               </div>
               <div className="h-3 overflow-hidden rounded-full bg-white/10">
                 <motion.div

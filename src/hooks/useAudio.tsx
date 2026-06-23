@@ -10,6 +10,7 @@ import React, {
   useState,
 } from 'react'
 import { storage } from '../lib/storage'
+import { emitBeat } from '../lib/beat'
 
 export type SfxName =
   | 'correct'
@@ -493,6 +494,13 @@ export function AudioProvider({
         // Kick on beats 1 & 3: a fast sine pitch-drop.
         tone(ctx, mg, { type: 'sine', freq: 150, endFreq: 45, start: t, duration: 0.13, peak: 0.5, attack: 0.002, release: 0.1 })
         tone(ctx, mg, { type: 'sine', freq: 150, endFreq: 45, start: t + 1.0, duration: 0.13, peak: 0.4, attack: 0.002, release: 0.1 })
+        // Drive the sound-reactive background: a beat on each kick. Beat 1 is
+        // "now"; beat 3 is one second out. Fire-and-forget — a stray pulse after
+        // the music stops is harmless (it just nudges one element once).
+        emitBeat(1)
+        window.setTimeout(() => {
+          if (musicGainRef.current) emitBeat(0.7)
+        }, 1000)
         // Brushed backbeat on 2 & 4.
         noiseBurst(ctx, mg, { start: t + 0.5, duration: 0.09, peak: 0.05, startFreq: 1800, endFreq: 900 })
         noiseBurst(ctx, mg, { start: t + 1.5, duration: 0.09, peak: 0.055, startFreq: 1800, endFreq: 900 })

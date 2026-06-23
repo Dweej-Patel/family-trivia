@@ -10,6 +10,7 @@ import { disconnectDb } from '../../lib/firebase'
 import { MANUAL_BONUS_WINDOW } from '../../multiplayer/scoring'
 import { useAudio } from '../../hooks/useAudio'
 import { fireConfetti } from '../ui/ConfettiBurst'
+import { StreakFlair, StreakEdgeGlow, ON_FIRE } from '../game/StreakFlair'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { RotatingTagline } from '../ui/RotatingTagline'
@@ -134,7 +135,7 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
     if (revealSoundFor.current === question.index) return
     revealSoundFor.current = question.index
     if (myAnswer?.correct) {
-      fireConfetti()
+      fireConfetti(identity?.color)
       play('correct')
       buzz([30, 40, 30])
       setStreak((s) => s + 1)
@@ -162,7 +163,7 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
     if (finishFired.current) return
     finishFired.current = true
     if (myRank === 1) {
-      fireConfetti()
+      fireConfetti(identity?.color)
       play('victory')
     }
   }, [status, myRank, play])
@@ -483,6 +484,8 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
         })}
       </div>
 
+      <StreakEdgeGlow active={isReveal && !!myAnswer?.correct && streak >= ON_FIRE} />
+
       {/* ── Feedback banner ── */}
       <AnimatePresence mode="wait">
         {status === 'question' && locked && (
@@ -516,16 +519,7 @@ function ActivePlayer({ code, uid, identity }: ActivePlayerProps) {
                 <p className="font-display text-4xl font-bold text-mint">
                   Correct! ✓ +{myAnswer.awarded ?? 0}
                 </p>
-                {streak >= 2 && (
-                  <motion.p
-                    initial={{ scale: 0, rotate: -8 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 14 }}
-                    className="rounded-full bg-tangerine/25 px-4 py-1.5 font-display text-xl font-bold text-sunny"
-                  >
-                    🔥 {streak} in a row!
-                  </motion.p>
-                )}
+                <StreakFlair streak={streak} color={identity?.color} />
               </>
             ) : (
               <>

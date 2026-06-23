@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import type { Player } from '../../types'
 import { rankPlayers, groupByPlace, type RankedPlayer } from '../../lib/ranking'
+import { RollingNumber } from '../ui/RollingNumber'
 
 // Visual styling per place. Layout order keeps the classic 2nd | 1st | 3rd shape.
 const SLOT_STYLE: Record<
@@ -99,9 +100,21 @@ export function Podium({ players }: { players: Player[] }) {
               </div>
 
               <div className="mt-1 font-display text-xs font-bold text-white/70 sm:text-sm tabular-nums">
-                {group[0].score}
+                <RollingNumber value={group[0].score} />
                 {many && ' • tie'}
               </div>
+
+              {/* Sole champion gets an MVP ribbon */}
+              {isWinner && !many && (
+                <motion.div
+                  initial={{ scale: 0, y: 6 }}
+                  animate={{ scale: 1, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 16, delay: delay + 0.25 }}
+                  className="mt-1 inline-flex items-center gap-1 rounded-full border border-sunny/70 bg-sunny/20 px-2.5 py-0.5 font-display text-[0.65rem] font-bold uppercase tracking-wider text-sunny"
+                >
+                  🏆 MVP
+                </motion.div>
+              )}
             </motion.div>
 
             {/* The pillar springs up from the floor */}

@@ -48,9 +48,9 @@ const screens: Record<Screen, React.ComponentType> = {
 }
 
 const pageVariants = {
-  initial: { opacity: 0, scale: 0.96, y: 16 },
-  animate: { opacity: 1, scale: 1, y: 0 },
-  exit: { opacity: 0, scale: 1.02, y: -16 },
+  initial: { opacity: 0, scale: 0.95, y: 22, rotateX: -10 },
+  animate: { opacity: 1, scale: 1, y: 0, rotateX: 0 },
+  exit: { opacity: 0, scale: 1.02, y: -16, rotateX: 6 },
 }
 
 /** Polls version.json and offers a one-tap refresh when a newer build is live,
@@ -210,6 +210,7 @@ export default function App() {
               initial="initial"
               animate="animate"
               transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+              style={{ transformPerspective: 1200, transformOrigin: 'center top' }}
               className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-6 sm:px-6"
             >
               <Current />

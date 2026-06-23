@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGame, useCurrentQuestion } from '../../store/gameStore'
 import { useAudio } from '../../hooks/useAudio'
@@ -10,6 +10,10 @@ import { AnswerOption, type AnswerState } from '../game/AnswerOption'
 import { CountdownRing } from '../game/CountdownRing'
 import { TurnBanner } from '../game/TurnBanner'
 import { ScoreHUD } from '../game/ScoreHUD'
+import { Brainy, type BrainyMood } from '../ui/Brainy'
+import { StreakFlair, StreakEdgeGlow, ON_FIRE } from '../game/StreakFlair'
+import { RoundIntro } from '../game/RoundIntro'
+import { buzz } from '../../lib/haptics'
 import type { Difficulty } from '../../types'
 
 const difficultyStyles: Record<Difficulty, { label: string; className: string }> = {
@@ -32,6 +36,7 @@ export function PlayScreen() {
 
   const selectAnswer = useGame((s) => s.selectAnswer)
   const reveal = useGame((s) => s.reveal)
+  const breakStreak = useGame((s) => s.breakStreak)
   const nextQuestion = useGame((s) => s.nextQuestion)
 
   const { play } = useAudio()
@@ -39,6 +44,15 @@ export function PlayScreen() {
   // Local "time ran out with no answer" state: we just show the correct answer
   // (no points awarded) since the store's reveal() ignores a null selection.
   const [timeUp, setTimeUp] = useState(false)
+
+  // Game-show "get ready" overlay — the category reveal + 3·2·1·GO opener. Only
+  // at the true game start (currentIndex 0); halftime returns re-mount PlayScreen
+  // too (every player cycle), and replaying the countdown there would nag.
+  const [showIntro, setShowIntro] = useState(() => currentIndex === 0)
+  const introCategory = useMemo(() => {
+    const cats = Array.from(new Set(deck.map((q) => q.category)))
+    return cats.length === 1 ? cats[0] : 'Mixed Trivia'
+  }, [deck])
 
   const totalQuestions = deck.length
   const hasPlayers = players.length > 0
@@ -54,7 +68,9 @@ export function PlayScreen() {
   }, [currentIndex, play])
 
   // ── Timer ──────────────────────────────────────────────────────────────────
-  const timerActive = timerEnabled && !showResults && !!question
+  // Hold the clock until the round-intro countdown finishes — no fair starting
+  // the timer behind the "3·2·1·GO" curtain.
+  const timerActive = timerEnabled && !showResults && !!question && !showIntro
 
   const handleTick = (remaining: number) => {
     if (remaining <= 0) return
@@ -94,12 +110,14 @@ export function PlayScreen() {
     feedbackFiredRef.current = true
     const correct = selectedAnswer === question.correctIndex
     if (correct) {
-      fireConfetti()
+      fireConfetti(activePlayer?.color)
       play('correct')
+      buzz([30, 40, 30])
     } else {
       play('wrong')
+      buzz(80)
     }
-  }, [revealed, selectedAnswer, question, play])
+  }, [revealed, selectedAnswer, question, play, activePlayer?.color])
 
   // When the timer forces a no-answer reveal, play the wrong cue once.
   const timeUpFiredRef = useRef(false)
@@ -111,7 +129,10 @@ export function PlayScreen() {
     if (timeUpFiredRef.current) return
     timeUpFiredRef.current = true
     play('wrong')
-  }, [timeUp, play])
+    buzz(80)
+    // No answer locked in — the active player's streak ends here.
+    breakStreak()
+  }, [timeUp, play, breakStreak])
 
   // Graceful fallback while the deck/question hydrates.
   if (!question) return null
@@ -144,8 +165,29 @@ export function PlayScreen() {
   const diff = difficultyStyles[question.difficulty]
   const isLastQuestion = currentIndex + 1 >= totalQuestions
 
+  // Brainy reacts to where we are: leaning in while you decide, then celebrating,
+  // sympathizing, or going dizzy on a timeout when the answer lands.
+  const wasCorrect = selectedAnswer === question.correctIndex
+  const brainyMood: BrainyMood = !showResults
+    ? 'thinking'
+    : timeUp
+      ? 'timeout'
+      : wasCorrect
+        ? 'happy'
+        : 'sad'
+  // The active player's running streak feeds Brainy's glowing "neuron charge".
+  const activeStreak = activePlayer?.streak ?? 0
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 py-4">
+      <StreakEdgeGlow active={showResults && wasCorrect && activeStreak >= ON_FIRE} />
+
+      <AnimatePresence>
+        {showIntro && (
+          <RoundIntro category={introCategory} onDone={() => setShowIntro(false)} />
+        )}
+      </AnimatePresence>
+
       {/* ── Header: counter + meta ─────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="font-display text-lg font-bold text-white/80">
@@ -182,15 +224,16 @@ export function PlayScreen() {
         </div>
       )}
 
-      {/* ── Timer ──────────────────────────────────────────────────────────── */}
-      {timerEnabled && (
-        <div className="flex justify-center">
+      {/* ── Brainy + timer ─────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-center gap-4">
+        <Brainy mood={brainyMood} size={timerEnabled ? 76 : 92} charge={activeStreak} />
+        {timerEnabled && (
           <CountdownRing
             remaining={showResults ? 0 : remaining}
             total={timerSeconds}
           />
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ── Question prompt ────────────────────────────────────────────────── */}
       <AnimatePresence mode="wait">
@@ -229,6 +272,9 @@ export function PlayScreen() {
           <span className="font-display text-lg font-bold text-red-400">
             ⏰ Time's up!
           </span>
+        )}
+        {showResults && wasCorrect && hasPlayers && activeStreak >= 2 && (
+          <StreakFlair streak={activeStreak} color={activePlayer?.color} />
         )}
         {!showResults ? (
           <Button
