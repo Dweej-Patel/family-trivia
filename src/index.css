@@ -18,7 +18,14 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-  background: #2e1065;
+  /* The colorful screen background is a fixed, full-bleed layer, but iPhone
+     safe areas (notch + home indicator) and iOS overscroll bounce fall back to
+     the document background. A flat color left a mismatched solid bar at the
+     top/bottom edges, so match the page's top (darkened grape) and bottom
+     (darkened ember) tones here. The middle keeps the original deep purple —
+     that's all that shows through behind the 90%-opaque background layer. */
+  background-color: #2e1065;
+  background-image: linear-gradient(180deg, #522ba4 0%, #2e1065 50%, #5a323e 100%);
   /* No pull-to-refresh / scroll chaining: an accidental swipe-down
      mid-question shouldn't reload the game. */
   overscroll-behavior-y: none;
