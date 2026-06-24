@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useAudio } from '../../hooks/useAudio'
-import { Brainy } from '../ui/Brainy'
+import { Mascot } from '../ui/Mascot'
 
 interface Frame {
   kind: 'category' | 'count' | 'go'
@@ -81,7 +81,7 @@ export function RoundIntro({ category, onDone }: { category: string; onDone: () 
             transition={{ type: 'spring', stiffness: 220, damping: 18 }}
             style={{ transformPerspective: 800 }}
           >
-            <Brainy mood="happy" size={96} />
+            <Mascot mood="happy" size={96} />
             <span className="font-display text-xl font-bold uppercase tracking-widest text-white/70">
               Category
             </span>

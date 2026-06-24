@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useGame } from '../../store/gameStore'
 import { useAudio } from '../../hooks/useAudio'
 import { Button } from '../ui/Button'
-import { Brainy } from '../ui/Brainy'
+import { Mascot } from '../ui/Mascot'
 
 const TITLE_WORDS = ['Family', 'Trivia']
 
@@ -25,7 +25,7 @@ export function HomeScreen() {
         animate={{ scale: 1, rotate: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 240, damping: 16 }}
       >
-        <Brainy mood="idle" size={156} />
+        <Mascot mood="idle" size={156} />
       </motion.div>
 
       <h1 className="font-display text-6xl font-bold leading-none sm:text-8xl">

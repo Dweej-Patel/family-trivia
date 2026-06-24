@@ -10,7 +10,7 @@ import { AnswerOption, type AnswerState } from '../game/AnswerOption'
 import { CountdownRing } from '../game/CountdownRing'
 import { TurnBanner } from '../game/TurnBanner'
 import { ScoreHUD } from '../game/ScoreHUD'
-import { Brainy, type BrainyMood } from '../ui/Brainy'
+import { Mascot, type MascotMood } from '../ui/Mascot'
 import { StreakFlair, StreakEdgeGlow, ON_FIRE } from '../game/StreakFlair'
 import { RoundIntro } from '../game/RoundIntro'
 import { buzz } from '../../lib/haptics'
@@ -165,17 +165,17 @@ export function PlayScreen() {
   const diff = difficultyStyles[question.difficulty]
   const isLastQuestion = currentIndex + 1 >= totalQuestions
 
-  // Brainy reacts to where we are: leaning in while you decide, then celebrating,
-  // sympathizing, or going dizzy on a timeout when the answer lands.
+  // The mascot reacts to where we are: leaning in while you decide, then
+  // celebrating, sympathizing, or short-circuiting on a timeout when it lands.
   const wasCorrect = selectedAnswer === question.correctIndex
-  const brainyMood: BrainyMood = !showResults
+  const mascotMood: MascotMood = !showResults
     ? 'thinking'
     : timeUp
       ? 'timeout'
       : wasCorrect
         ? 'happy'
         : 'sad'
-  // The active player's running streak feeds Brainy's glowing "neuron charge".
+  // The active player's running streak lights the mascot's status LEDs.
   const activeStreak = activePlayer?.streak ?? 0
 
   return (
@@ -226,7 +226,7 @@ export function PlayScreen() {
 
       {/* ── Brainy + timer ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-center gap-4">
-        <Brainy mood={brainyMood} size={timerEnabled ? 76 : 92} charge={activeStreak} />
+        <Mascot mood={mascotMood} size={timerEnabled ? 84 : 96} charge={activeStreak} />
         {timerEnabled && (
           <CountdownRing
             remaining={showResults ? 0 : remaining}
