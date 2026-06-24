@@ -91,20 +91,23 @@ function Eyes({ mood }: { mood: BrainyMood }) {
       </g>
     )
   }
-  // Default round eyes; pupils look up while thinking, down while sad.
+  // Default big round eyes; pupils look up while thinking, down while sad.
   const dy = mood === 'thinking' ? -2 : mood === 'sad' ? 2 : 0
   return (
     <g>
-      <ellipse cx={50} cy={53} rx={7} ry={8} fill={white} />
-      <ellipse cx={70} cy={53} rx={7} ry={8} fill={white} />
-      <circle cx={50} cy={53 + dy} r={3.6} fill={pupil} />
-      <circle cx={70} cy={53 + dy} r={3.6} fill={pupil} />
-      <circle cx={51.4} cy={51.4 + dy} r={1.2} fill={white} />
-      <circle cx={71.4} cy={51.4 + dy} r={1.2} fill={white} />
+      <ellipse cx={49} cy={53} rx={8} ry={9.5} fill={white} />
+      <ellipse cx={71} cy={53} rx={8} ry={9.5} fill={white} />
+      <circle cx={49} cy={53 + dy} r={4.4} fill={pupil} />
+      <circle cx={71} cy={53 + dy} r={4.4} fill={pupil} />
+      {/* big highlight + small twinkle = friendly, alive eyes */}
+      <circle cx={50.8} cy={50.8 + dy} r={1.9} fill={white} />
+      <circle cx={72.8} cy={50.8 + dy} r={1.9} fill={white} />
+      <circle cx={47.4} cy={54.8 + dy} r={1} fill={white} opacity={0.8} />
+      <circle cx={69.4} cy={54.8 + dy} r={1} fill={white} opacity={0.8} />
       {mood === 'sad' && (
         <g stroke={pupil} strokeWidth={2.4} strokeLinecap="round" fill="none">
-          <path d="M44 45 Q50 43 55 46" />
-          <path d="M65 46 Q70 43 76 45" />
+          <path d="M43 45 Q49 43 55 46" />
+          <path d="M65 46 Q71 43 77 45" />
         </g>
       )}
     </g>
@@ -116,7 +119,13 @@ function Mouth({ mood }: { mood: BrainyMood }) {
   const line = '#3b0764'
   switch (mood) {
     case 'happy':
-      return <path d="M48 66 Q60 80 72 66 Q60 72 48 66 Z" fill={line} />
+      // A modest open smile (not a tall dark void) with a little tongue.
+      return (
+        <g>
+          <path d="M52 66 Q60 75 68 66 Q60 70 52 66 Z" fill={line} />
+          <path d="M57 70.5 Q60 73.5 63 70.5 Z" fill="#fb7185" />
+        </g>
+      )
     case 'sad':
       return (
         <path
@@ -177,10 +186,10 @@ export function Brainy({ mood = 'idle', size = 120, charge = 0, className }: Bra
     >
       <svg viewBox="0 0 120 120" width="100%" height="100%" aria-hidden>
         <defs>
-          <radialGradient id="brainy-fill" cx="42%" cy="34%" r="75%">
-            <stop offset="0%" stopColor="#fbcfe8" />
-            <stop offset="55%" stopColor="#f472b6" />
-            <stop offset="100%" stopColor="#db2777" />
+          <radialGradient id="brainy-fill" cx="42%" cy="32%" r="78%">
+            <stop offset="0%" stopColor="#fff1f7" />
+            <stop offset="55%" stopColor="#fbcfe8" />
+            <stop offset="100%" stopColor="#f9a8d4" />
           </radialGradient>
         </defs>
 
@@ -215,21 +224,25 @@ export function Brainy({ mood = 'idle', size = 120, charge = 0, className }: Bra
           <rect x={45} y={30} width={30} height={52} rx={14} fill="url(#brainy-fill)" />
         </g>
 
-        {/* Gyri (brain folds) + central fissure */}
+        {/* A few soft swirls hint at "brain" without the anatomical (creepy) look */}
         <g
-          stroke="#be185d"
-          strokeOpacity={0.55}
-          strokeWidth={2}
+          stroke="#f472b6"
+          strokeOpacity={0.5}
+          strokeWidth={1.6}
           strokeLinecap="round"
           fill="none"
         >
-          <path d="M60 32 Q57 44 60 56 Q63 70 60 82" />
-          <path d="M34 44 q6 4 2 10" />
-          <path d="M30 60 q7 2 9 8" />
-          <path d="M86 44 q-6 4 -2 10" />
-          <path d="M90 60 q-7 2 -9 8" />
-          <path d="M46 72 q5 5 12 4" />
-          <path d="M74 72 q-5 5 -12 4" />
+          <path d="M60 33 Q57 45 60 57 Q63 70 60 80" />
+          <path d="M36 47 q5 4 2 9" />
+          <path d="M84 47 q-5 4 -2 9" />
+          <path d="M45 71 q6 4 13 2" />
+          <path d="M75 71 q-6 4 -13 2" />
+        </g>
+
+        {/* Rosy blush cheeks for cuteness */}
+        <g fill="#fb7185" opacity={0.45}>
+          <ellipse cx={40} cy={63} rx={5.5} ry={3.8} />
+          <ellipse cx={80} cy={63} rx={5.5} ry={3.8} />
         </g>
 
         {/* Face — blinks in calm moods via a quick scaleY pinch */}
